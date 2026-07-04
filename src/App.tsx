@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { BrowserRouter as Router, Routes, Route, NavLink, useLocation, Navigate } from 'react-router-dom';
+import { BrowserRouter as Router, Routes, Route, NavLink, useLocation } from 'react-router-dom';
 import { 
   LayoutDashboard, 
   Users, 
@@ -8,7 +8,6 @@ import {
   CreditCard, 
   Ticket,
   LogOut,
-  Settings,
   Activity,
   Mail
 } from 'lucide-react';

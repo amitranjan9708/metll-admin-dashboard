@@ -54,5 +54,14 @@ export const AdminService = {
       },
     });
     return response.data;
+  },
+
+  createProfile: async (formData: FormData) => {
+    const response = await api.post('/admin/profiles', formData, {
+      headers: {
+        'Content-Type': 'multipart/form-data',
+      },
+    });
+    return response.data;
   }
 };

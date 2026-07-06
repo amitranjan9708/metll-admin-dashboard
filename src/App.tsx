@@ -5,11 +5,12 @@ import {
   Users, 
   MessageSquare, 
   Heart, 
-  CreditCard, 
+  CreditCard,
   Ticket,
   LogOut,
   Activity,
-  Mail
+  Mail,
+  UserPlus
 } from 'lucide-react';
 import { api, AdminService } from './services/api';
 import './App.css';
@@ -124,6 +125,7 @@ const Sidebar = ({ onLogout }: { onLogout: () => void }) => {
     { path: '/subscriptions', icon: <CreditCard size={20} />, label: 'Subscriptions' },
     { path: '/bulk-email', icon: <Mail size={20} />, label: 'Bulk Email' },
     { path: '/tickets', icon: <Ticket size={20} />, label: 'Support Tickets' },
+    { path: '/create-profile', icon: <UserPlus size={20} />, label: 'Create Profile' },
   ];
 
   return (
@@ -163,7 +165,9 @@ const Topnav = () => {
       case '/matching': return 'Matching & Likes';
       case '/chats': return 'Chat Monitoring';
       case '/subscriptions': return 'Subscriptions & Payments';
+      case '/bulk-email': return 'Bulk Email';
       case '/tickets': return 'Support Tickets';
+      case '/create-profile': return 'Create New Profile';
       default: return 'Admin Dashboard';
     }
   };
@@ -567,6 +571,273 @@ const BulkEmailPage = () => {
   );
 };
 
+const SITUATIONS = [
+    { id: 1, category: 'Dating', emoji: '💕', question: "Your date is 30 minutes late without texting. What do you do?" },
+    { id: 2, category: 'Dating', emoji: '🌹', question: "You realize your date is your best friend's ex. What's your move?" },
+    { id: 3, category: 'Dating', emoji: '💭', question: "Your crush posts about being single, but they've been ignoring your messages. What do you do?" },
+    { id: 4, category: 'Dating', emoji: '🎭', question: "On the first date, they spend 20 minutes on their phone. How do you handle it?" },
+    { id: 5, category: 'Dating', emoji: '🎪', question: "You accidentally like your crush's photo from 2 years ago. What's your next move?" },
+    { id: 6, category: 'Social', emoji: '🎉', question: "You're at a party where you don't know anyone except the host who's busy. What do you do?" },
+    { id: 7, category: 'Social', emoji: '🤝', question: "Your friend's partner hits on you when they're not around. How do you handle it?" },
+    { id: 8, category: 'Social', emoji: '😬', question: "You witness someone being rude to a waiter. What's your reaction?" },
+    { id: 9, category: 'Social', emoji: '🎤', question: "At karaoke, everyone's pressuring you to sing but you're shy. What do you do?" },
+    { id: 10, category: 'Social', emoji: '🍕', question: "Your friends order pineapple pizza and you hate it. Do you speak up or eat it?" },
+    { id: 11, category: 'Adventure', emoji: '✈️', question: "You have $500 and 3 days off. Beach getaway or mountain trek?" }
+];
+
+const CreateProfilePage = () => {
+  const [formData, setFormData] = useState({
+    name: '',
+    age: '',
+    gender: 'male',
+    bio: '',
+    height: '',
+    currentCity: '',
+    drinking: 'prefer_not_say',
+    smoking: 'prefer_not_say',
+    children: 'open',
+    relationshipType: 'open_to_all',
+    datingIntention: 'open_to_all',
+    genderPreference: 'all',
+    ageMin: '18',
+    ageMax: '35',
+    distanceMax: '50'
+  });
+  const [files, setFiles] = useState<File[]>([]);
+  const [personalityResponses, setPersonalityResponses] = useState<{questionId: number, answer: string}[]>([{ questionId: 1, answer: '' }]);
+  const [loading, setLoading] = useState(false);
+  
+  const handleAddQuestion = () => {
+    setPersonalityResponses([...personalityResponses, { questionId: 1, answer: '' }]);
+  };
+
+  const handleQuestionChange = (index: number, field: string, value: string | number) => {
+    const newResponses = [...personalityResponses];
+    if (field === 'questionId') {
+      newResponses[index].questionId = Number(value);
+    } else {
+      newResponses[index].answer = String(value);
+    }
+    setPersonalityResponses(newResponses);
+  };
+
+  const handleRemoveQuestion = (index: number) => {
+    const newResponses = [...personalityResponses];
+    newResponses.splice(index, 1);
+    setPersonalityResponses(newResponses);
+  };
+
+  const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    if (e.target.files) {
+      setFiles(Array.from(e.target.files).slice(0, 6)); // Max 6 files
+    }
+  };
+
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!formData.name || !formData.age || !formData.gender || files.length === 0) {
+      alert("Name, age, gender, and at least one image are required.");
+      return;
+    }
+
+    setLoading(true);
+    try {
+      const data = new FormData();
+      data.append('name', formData.name);
+      data.append('age', formData.age);
+      data.append('gender', formData.gender);
+      data.append('bio', formData.bio);
+      if (formData.height) data.append('height', formData.height);
+      if (formData.currentCity) data.append('currentCity', formData.currentCity);
+      if (formData.drinking) data.append('drinking', formData.drinking);
+      if (formData.smoking) data.append('smoking', formData.smoking);
+      if (formData.children) data.append('children', formData.children);
+      if (formData.relationshipType) data.append('relationshipType', formData.relationshipType);
+      if (formData.datingIntention) data.append('datingIntention', formData.datingIntention);
+      if (formData.genderPreference) data.append('genderPreference', formData.genderPreference);
+      if (formData.ageMin) data.append('ageMin', formData.ageMin);
+      if (formData.ageMax) data.append('ageMax', formData.ageMax);
+      if (formData.distanceMax) data.append('distanceMax', formData.distanceMax);
+      data.append('personalityResponses', JSON.stringify(personalityResponses.filter(p => p.answer.trim() !== '')));
+      
+      files.forEach(file => {
+        data.append('images', file);
+      });
+
+      const res = await AdminService.createProfile(data);
+      if (res.success) {
+        alert("Profile created successfully!");
+        setFormData({ 
+          name: '', age: '', gender: 'male', bio: '', 
+          height: '', currentCity: '', drinking: 'prefer_not_say', smoking: 'prefer_not_say',
+          children: 'open', relationshipType: 'open_to_all', datingIntention: 'open_to_all',
+          genderPreference: 'all', ageMin: '18', ageMax: '35', distanceMax: '50'
+        });
+        setFiles([]);
+        setPersonalityResponses([{ questionId: 1, answer: '' }]);
+      }
+    } catch (error: any) {
+      console.error(error);
+      alert(error.response?.data?.message || 'Failed to create profile');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  return (
+    <div className="card">
+      <h2>Create New Profile</h2>
+      <p style={{ color: 'var(--text-secondary)', marginBottom: '1.5rem' }}>This profile will be verified and added to the discover section automatically.</p>
+      
+      <form onSubmit={handleSubmit} style={{ display: 'flex', flexDirection: 'column', gap: '1rem', maxWidth: '600px' }}>
+        <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
+          <label style={{ fontWeight: 500 }}>Name *</label>
+          <input type="text" value={formData.name} onChange={e => setFormData({...formData, name: e.target.value})} style={{ padding: '0.75rem', borderRadius: '8px', border: '1px solid var(--border-color)', background: 'var(--bg-sidebar)', color: '#fff' }} required />
+        </div>
+        
+        <div style={{ display: 'flex', gap: '1rem' }}>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem', flex: 1 }}>
+            <label style={{ fontWeight: 500 }}>Age *</label>
+            <input type="number" value={formData.age} onChange={e => setFormData({...formData, age: e.target.value})} style={{ padding: '0.75rem', borderRadius: '8px', border: '1px solid var(--border-color)', background: 'var(--bg-sidebar)', color: '#fff' }} required />
+          </div>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem', flex: 1 }}>
+            <label style={{ fontWeight: 500 }}>Gender *</label>
+            <select value={formData.gender} onChange={e => setFormData({...formData, gender: e.target.value})} style={{ padding: '0.75rem', borderRadius: '8px', border: '1px solid var(--border-color)', background: 'var(--bg-sidebar)', color: '#fff' }}>
+              <option value="male">Male</option>
+              <option value="female">Female</option>
+              <option value="non-binary">Non-binary</option>
+              <option value="other">Other</option>
+            </select>
+          </div>
+        </div>
+
+        <div style={{ display: 'flex', gap: '1rem' }}>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem', flex: 1 }}>
+            <label style={{ fontWeight: 500 }}>Height (cm)</label>
+            <input type="number" value={formData.height} onChange={e => setFormData({...formData, height: e.target.value})} style={{ padding: '0.75rem', borderRadius: '8px', border: '1px solid var(--border-color)', background: 'var(--bg-sidebar)', color: '#fff' }} />
+          </div>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem', flex: 1 }}>
+            <label style={{ fontWeight: 500 }}>Current City</label>
+            <input type="text" value={formData.currentCity} onChange={e => setFormData({...formData, currentCity: e.target.value})} style={{ padding: '0.75rem', borderRadius: '8px', border: '1px solid var(--border-color)', background: 'var(--bg-sidebar)', color: '#fff' }} />
+          </div>
+        </div>
+
+        <div style={{ display: 'flex', gap: '1rem' }}>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem', flex: 1 }}>
+            <label style={{ fontWeight: 500 }}>Drinking</label>
+            <select value={formData.drinking} onChange={e => setFormData({...formData, drinking: e.target.value})} style={{ padding: '0.75rem', borderRadius: '8px', border: '1px solid var(--border-color)', background: 'var(--bg-sidebar)', color: '#fff' }}>
+              <option value="prefer_not_say">Prefer not to say</option>
+              <option value="never">Never</option>
+              <option value="socially">Socially</option>
+              <option value="regularly">Regularly</option>
+            </select>
+          </div>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem', flex: 1 }}>
+            <label style={{ fontWeight: 500 }}>Smoking</label>
+            <select value={formData.smoking} onChange={e => setFormData({...formData, smoking: e.target.value})} style={{ padding: '0.75rem', borderRadius: '8px', border: '1px solid var(--border-color)', background: 'var(--bg-sidebar)', color: '#fff' }}>
+              <option value="prefer_not_say">Prefer not to say</option>
+              <option value="never">Never</option>
+              <option value="sometimes">Sometimes</option>
+              <option value="regularly">Regularly</option>
+            </select>
+          </div>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem', flex: 1 }}>
+            <label style={{ fontWeight: 500 }}>Children</label>
+            <select value={formData.children} onChange={e => setFormData({...formData, children: e.target.value})} style={{ padding: '0.75rem', borderRadius: '8px', border: '1px solid var(--border-color)', background: 'var(--bg-sidebar)', color: '#fff' }}>
+              <option value="open">Open to it</option>
+              <option value="have">Have kids</option>
+              <option value="want">Want kids</option>
+              <option value="dont_want">Don't want</option>
+            </select>
+          </div>
+        </div>
+
+        <div style={{ display: 'flex', gap: '1rem' }}>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem', flex: 1 }}>
+            <label style={{ fontWeight: 500 }}>Relationship Type</label>
+            <select value={formData.relationshipType} onChange={e => setFormData({...formData, relationshipType: e.target.value})} style={{ padding: '0.75rem', borderRadius: '8px', border: '1px solid var(--border-color)', background: 'var(--bg-sidebar)', color: '#fff' }}>
+              <option value="open_to_all">Open to all</option>
+              <option value="monogamy">Monogamy</option>
+              <option value="non_monogamy">Non-monogamy</option>
+              <option value="friends_first">Friends first</option>
+              <option value="figuring_out">Figuring out</option>
+            </select>
+          </div>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem', flex: 1 }}>
+            <label style={{ fontWeight: 500 }}>Dating Intention</label>
+            <select value={formData.datingIntention} onChange={e => setFormData({...formData, datingIntention: e.target.value})} style={{ padding: '0.75rem', borderRadius: '8px', border: '1px solid var(--border-color)', background: 'var(--bg-sidebar)', color: '#fff' }}>
+              <option value="open_to_all">Open to all</option>
+              <option value="casual">Casual</option>
+              <option value="serious">Serious</option>
+              <option value="marriage">Marriage</option>
+            </select>
+          </div>
+        </div>
+
+        <div style={{ display: 'flex', gap: '1rem' }}>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem', flex: 1 }}>
+            <label style={{ fontWeight: 500 }}>Gender Pref.</label>
+            <select value={formData.genderPreference} onChange={e => setFormData({...formData, genderPreference: e.target.value})} style={{ padding: '0.75rem', borderRadius: '8px', border: '1px solid var(--border-color)', background: 'var(--bg-sidebar)', color: '#fff' }}>
+              <option value="all">Everyone</option>
+              <option value="male">Men</option>
+              <option value="female">Women</option>
+              <option value="non-binary">Non-binary</option>
+            </select>
+          </div>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem', flex: 1 }}>
+            <label style={{ fontWeight: 500 }}>Age Min</label>
+            <input type="number" value={formData.ageMin} onChange={e => setFormData({...formData, ageMin: e.target.value})} style={{ padding: '0.75rem', borderRadius: '8px', border: '1px solid var(--border-color)', background: 'var(--bg-sidebar)', color: '#fff' }} />
+          </div>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem', flex: 1 }}>
+            <label style={{ fontWeight: 500 }}>Age Max</label>
+            <input type="number" value={formData.ageMax} onChange={e => setFormData({...formData, ageMax: e.target.value})} style={{ padding: '0.75rem', borderRadius: '8px', border: '1px solid var(--border-color)', background: 'var(--bg-sidebar)', color: '#fff' }} />
+          </div>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem', flex: 1 }}>
+            <label style={{ fontWeight: 500 }}>Distance (km)</label>
+            <input type="number" value={formData.distanceMax} onChange={e => setFormData({...formData, distanceMax: e.target.value})} style={{ padding: '0.75rem', borderRadius: '8px', border: '1px solid var(--border-color)', background: 'var(--bg-sidebar)', color: '#fff' }} />
+          </div>
+        </div>
+
+        <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
+          <label style={{ fontWeight: 500 }}>Bio</label>
+          <textarea value={formData.bio} onChange={e => setFormData({...formData, bio: e.target.value})} rows={3} style={{ padding: '0.75rem', borderRadius: '8px', border: '1px solid var(--border-color)', background: 'var(--bg-sidebar)', color: '#fff' }} />
+        </div>
+
+        <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
+          <label style={{ fontWeight: 500 }}>Images (Max 6) *</label>
+          <input type="file" multiple accept="image/*" onChange={handleFileChange} style={{ color: '#fff' }} />
+          {files.length > 0 && <small style={{ color: 'var(--text-secondary)' }}>Selected {files.length} file(s)</small>}
+        </div>
+
+        <div style={{ marginTop: '1rem' }}>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1rem' }}>
+            <h3 style={{ fontSize: '1rem' }}>Personality Questions</h3>
+            <button type="button" onClick={handleAddQuestion} className="btn btn-secondary" style={{ padding: '0.25rem 0.75rem', fontSize: '0.875rem' }}>+ Add Question</button>
+          </div>
+          
+          {personalityResponses.map((item, index) => (
+            <div key={index} style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem', padding: '1rem', background: 'var(--bg-sidebar)', borderRadius: '8px', marginBottom: '1rem' }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+                <select value={item.questionId} onChange={(e) => handleQuestionChange(index, 'questionId', e.target.value)} style={{ padding: '0.5rem', borderRadius: '4px', background: 'var(--bg-card)', color: '#fff', border: '1px solid var(--border-color)', flex: 1, marginRight: '1rem' }}>
+                  {SITUATIONS.map(q => (
+                    <option key={q.id} value={q.id}>{q.emoji} {q.question}</option>
+                  ))}
+                </select>
+                <button type="button" onClick={() => handleRemoveQuestion(index)} style={{ background: 'transparent', border: 'none', color: 'var(--danger)', cursor: 'pointer' }}>Remove</button>
+              </div>
+              <textarea placeholder="Answer..." value={item.answer} onChange={(e) => handleQuestionChange(index, 'answer', e.target.value)} rows={2} style={{ padding: '0.5rem', borderRadius: '4px', background: 'var(--bg-card)', color: '#fff', border: '1px solid var(--border-color)' }} />
+            </div>
+          ))}
+        </div>
+
+        <button type="submit" className="btn btn-primary" disabled={loading} style={{ marginTop: '1rem', padding: '1rem', justifyContent: 'center' }}>
+          {loading ? 'Creating Profile...' : 'Create Profile'}
+        </button>
+      </form>
+    </div>
+  );
+};
+
 function App() {
   const [isAuthenticated, setIsAuthenticated] = useState(!!localStorage.getItem('admin_token'));
 
@@ -599,6 +870,7 @@ function App() {
               <Route path="/subscriptions" element={<SubscriptionsPage />} />
               <Route path="/bulk-email" element={<BulkEmailPage />} />
               <Route path="/tickets" element={<TicketsPage />} />
+              <Route path="/create-profile" element={<CreateProfilePage />} />
             </Routes>
           </div>
         </main>

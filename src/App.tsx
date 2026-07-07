@@ -908,6 +908,10 @@ const JobsPage = () => {
   const [showModal, setShowModal] = useState(false);
   const [formData, setFormData] = useState({ title: '', department: '', location: '', type: '', description: '' });
 
+  const [selectedJob, setSelectedJob] = useState<any | null>(null);
+  const [applications, setApplications] = useState<any[]>([]);
+  const [loadingApps, setLoadingApps] = useState(false);
+
   useEffect(() => {
     fetchJobs();
   }, []);
@@ -945,6 +949,26 @@ const JobsPage = () => {
     } catch (err) {
       console.error('Failed to delete job', err);
     }
+  };
+
+  const handleViewApplications = async (job: any) => {
+    setSelectedJob(job);
+    setLoadingApps(true);
+    try {
+      const res = await AdminService.getJobApplications(job.id);
+      if (res.success) {
+        setApplications(res.data);
+      }
+    } catch (err) {
+      console.error('Failed to fetch applications', err);
+    } finally {
+      setLoadingApps(false);
+    }
+  };
+
+  const closeApplicationsModal = () => {
+    setSelectedJob(null);
+    setApplications([]);
   };
 
   return (
@@ -992,7 +1016,10 @@ const JobsPage = () => {
                 <td>{job.type}</td>
                 <td>{job.isActive ? 'Active' : 'Inactive'}</td>
                 <td>
-                  <button className="btn btn-danger" onClick={() => handleDeleteJob(job.id)} style={{ padding: '4px 8px', fontSize: '12px' }}>Delete</button>
+                  <div style={{ display: 'flex', gap: '0.5rem' }}>
+                    <button className="btn btn-secondary" onClick={() => handleViewApplications(job)} style={{ padding: '4px 8px', fontSize: '12px' }}>Applications</button>
+                    <button className="btn btn-danger" onClick={() => handleDeleteJob(job.id)} style={{ padding: '4px 8px', fontSize: '12px' }}>Delete</button>
+                  </div>
                 </td>
               </tr>
             ))}
@@ -1003,6 +1030,57 @@ const JobsPage = () => {
             )}
           </tbody>
         </table>
+      )}
+
+      {selectedJob && (
+        <div style={{ position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, backgroundColor: 'rgba(0,0,0,0.5)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 1000, padding: '2rem' }}>
+          <div className="card" style={{ width: '100%', maxWidth: '900px', maxHeight: '90vh', overflowY: 'auto', position: 'relative' }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1.5rem' }}>
+              <h2>Applications for {selectedJob.title}</h2>
+              <button onClick={closeApplicationsModal} style={{ background: 'transparent', border: 'none', fontSize: '1.5rem', cursor: 'pointer', color: 'var(--text-primary)' }}>&times;</button>
+            </div>
+            
+            {loadingApps ? (
+              <p>Loading applications...</p>
+            ) : applications.length === 0 ? (
+              <p style={{ textAlign: 'center', padding: '2rem', color: 'var(--text-secondary)' }}>No applications received yet for this position.</p>
+            ) : (
+              <table className="table" style={{ fontSize: '14px' }}>
+                <thead>
+                  <tr>
+                    <th>Applicant</th>
+                    <th>Contact</th>
+                    <th>Location</th>
+                    <th>Qualification</th>
+                    <th>Applied On</th>
+                    <th>Resume</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {applications.map(app => (
+                    <tr key={app.id}>
+                      <td>
+                        <strong>{app.name}</strong>
+                      </td>
+                      <td>
+                        <div>{app.email}</div>
+                        <div style={{ fontSize: '12px', color: 'var(--text-secondary)' }}>{app.phone}</div>
+                      </td>
+                      <td>{app.location}</td>
+                      <td>{app.qualification}</td>
+                      <td>{new Date(app.createdAt).toLocaleDateString()}</td>
+                      <td>
+                        <a href={app.resumeUrl} target="_blank" rel="noreferrer" className="btn btn-primary" style={{ padding: '4px 8px', fontSize: '12px', textDecoration: 'none' }}>
+                          View Resume
+                        </a>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            )}
+          </div>
+        </div>
       )}
     </div>
   );

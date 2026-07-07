@@ -83,5 +83,10 @@ export const AdminService = {
   deleteJob: async (jobId: number) => {
     const response = await api.delete(`/admin/jobs/${jobId}`);
     return response.data;
+  },
+
+  getJobApplications: async (jobId: number) => {
+    const response = await api.get(`/admin/jobs/${jobId}/applications`);
+    return response.data;
   }
 };

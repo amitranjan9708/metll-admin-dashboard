@@ -1058,23 +1058,39 @@ const JobsPage = () => {
                 </thead>
                 <tbody>
                   {applications.map(app => (
-                    <tr key={app.id}>
-                      <td>
-                        <strong>{app.name}</strong>
-                      </td>
-                      <td>
-                        <div>{app.email}</div>
-                        <div style={{ fontSize: '12px', color: 'var(--text-secondary)' }}>{app.phone}</div>
-                      </td>
-                      <td>{app.location}</td>
-                      <td>{app.qualification}</td>
-                      <td>{new Date(app.createdAt).toLocaleDateString()}</td>
-                      <td>
-                        <a href={app.resumeUrl} target="_blank" rel="noreferrer" className="btn btn-primary" style={{ padding: '4px 8px', fontSize: '12px', textDecoration: 'none' }}>
-                          View Resume
-                        </a>
-                      </td>
-                    </tr>
+                    <React.Fragment key={app.id}>
+                      <tr>
+                        <td>
+                          <strong>{app.name}</strong>
+                        </td>
+                        <td>
+                          <div>{app.email}</div>
+                          <div style={{ fontSize: '12px', color: 'var(--text-secondary)' }}>{app.phone}</div>
+                        </td>
+                        <td>{app.location}</td>
+                        <td>{app.qualification}</td>
+                        <td>{new Date(app.createdAt).toLocaleDateString()}</td>
+                        <td>
+                          <a href={app.resumeUrl} target="_blank" rel="noreferrer" className="btn btn-primary" style={{ padding: '4px 8px', fontSize: '12px', textDecoration: 'none' }}>
+                            View Resume
+                          </a>
+                        </td>
+                      </tr>
+                      <tr style={{ backgroundColor: 'rgba(255,255,255,0.02)' }}>
+                        <td colSpan={6} style={{ padding: '12px', borderBottom: '2px solid var(--border-color)' }}>
+                          <div style={{ marginBottom: '8px' }}>
+                            <strong style={{ color: 'var(--text-secondary)' }}>Why Interested:</strong> 
+                            <p style={{ marginTop: '4px', fontSize: '13px', whiteSpace: 'pre-wrap' }}>{app.interest}</p>
+                          </div>
+                          {app.experience && (
+                            <div>
+                              <strong style={{ color: 'var(--text-secondary)' }}>Previous Experience:</strong> 
+                              <p style={{ marginTop: '4px', fontSize: '13px', whiteSpace: 'pre-wrap' }}>{app.experience}</p>
+                            </div>
+                          )}
+                        </td>
+                      </tr>
+                    </React.Fragment>
                   ))}
                 </tbody>
               </table>

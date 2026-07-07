@@ -971,6 +971,36 @@ const JobsPage = () => {
     setApplications([]);
   };
 
+  const exportToCSV = () => {
+    if (applications.length === 0 || !selectedJob) return;
+
+    const headers = ['Name', 'Email', 'Phone', 'Location', 'Qualification', 'Applied On', 'Resume Link'];
+    const rows = applications.map(app => [
+      `"${app.name.replace(/"/g, '""')}"`,
+      `"${app.email}"`,
+      `"${app.phone}"`,
+      `"${app.location.replace(/"/g, '""')}"`,
+      `"${app.qualification.replace(/"/g, '""')}"`,
+      `"${new Date(app.createdAt).toLocaleDateString()}"`,
+      `"${app.resumeUrl}"`
+    ]);
+
+    const csvContent = [
+      headers.join(','),
+      ...rows.map(row => row.join(','))
+    ].join('\n');
+
+    const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+    const link = document.createElement('a');
+    const url = URL.createObjectURL(blob);
+    link.setAttribute('href', url);
+    link.setAttribute('download', `applications-${selectedJob.title.replace(/[^a-z0-9]/gi, '_').toLowerCase()}.csv`);
+    link.style.visibility = 'hidden';
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+  };
+
   return (
     <div className="card">
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1rem' }}>
@@ -1037,7 +1067,14 @@ const JobsPage = () => {
           <div className="card" style={{ width: '100%', maxWidth: '900px', maxHeight: '90vh', overflowY: 'auto', position: 'relative' }}>
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1.5rem' }}>
               <h2>Applications for {selectedJob.title}</h2>
-              <button onClick={closeApplicationsModal} style={{ background: 'transparent', border: 'none', fontSize: '1.5rem', cursor: 'pointer', color: 'var(--text-primary)' }}>&times;</button>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '1rem' }}>
+                {applications.length > 0 && (
+                  <button onClick={exportToCSV} className="btn btn-secondary" style={{ padding: '6px 12px', fontSize: '13px' }}>
+                    Export CSV
+                  </button>
+                )}
+                <button onClick={closeApplicationsModal} style={{ background: 'transparent', border: 'none', fontSize: '1.5rem', cursor: 'pointer', color: 'var(--text-primary)' }}>&times;</button>
+              </div>
             </div>
             
             {loadingApps ? (

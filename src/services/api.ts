@@ -63,5 +63,25 @@ export const AdminService = {
       },
     });
     return response.data;
+  },
+
+  getFeedbacks: async () => {
+    const response = await api.get('/admin/feedbacks');
+    return response.data;
+  },
+
+  getJobs: async () => {
+    const response = await api.get('/admin/jobs');
+    return response.data;
+  },
+
+  createJob: async (data: any) => {
+    const response = await api.post('/admin/jobs', data);
+    return response.data;
+  },
+
+  deleteJob: async (jobId: number) => {
+    const response = await api.delete(`/admin/jobs/${jobId}`);
+    return response.data;
   }
 };

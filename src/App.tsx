@@ -10,7 +10,9 @@ import {
   LogOut,
   Activity,
   Mail,
-  UserPlus
+  UserPlus,
+  Briefcase,
+  MessageCircle
 } from 'lucide-react';
 import { api, AdminService } from './services/api';
 import './App.css';
@@ -126,6 +128,8 @@ const Sidebar = ({ onLogout }: { onLogout: () => void }) => {
     { path: '/bulk-email', icon: <Mail size={20} />, label: 'Bulk Email' },
     { path: '/tickets', icon: <Ticket size={20} />, label: 'Support Tickets' },
     { path: '/create-profile', icon: <UserPlus size={20} />, label: 'Create Profile' },
+    { path: '/feedback', icon: <MessageCircle size={20} />, label: 'User Feedback' },
+    { path: '/jobs', icon: <Briefcase size={20} />, label: 'Careers (Jobs)' },
   ];
 
   return (
@@ -838,6 +842,172 @@ const CreateProfilePage = () => {
   );
 };
 
+const FeedbackPage = () => {
+  const [feedbacks, setFeedbacks] = useState<any[]>([]);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    fetchFeedbacks();
+  }, []);
+
+  const fetchFeedbacks = async () => {
+    try {
+      setLoading(true);
+      const res = await AdminService.getFeedbacks();
+      if (res.success) {
+        setFeedbacks(res.data);
+      }
+    } catch (err) {
+      console.error('Failed to fetch feedbacks', err);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  return (
+    <div className="card">
+      <h2>Feedback Messages</h2>
+      {loading ? (
+        <p>Loading...</p>
+      ) : (
+        <table className="table" style={{ marginTop: '1rem' }}>
+          <thead>
+            <tr>
+              <th>ID</th>
+              <th>Name</th>
+              <th>Email</th>
+              <th>Message</th>
+              <th>Date</th>
+            </tr>
+          </thead>
+          <tbody>
+            {feedbacks.map((f: any) => (
+              <tr key={f.id}>
+                <td>#{f.id}</td>
+                <td>{f.name}</td>
+                <td>{f.email}</td>
+                <td>{f.suggestion}</td>
+                <td>{new Date(f.createdAt).toLocaleDateString()}</td>
+              </tr>
+            ))}
+            {feedbacks.length === 0 && (
+              <tr>
+                <td colSpan={5} style={{ textAlign: 'center' }}>No feedback found</td>
+              </tr>
+            )}
+          </tbody>
+        </table>
+      )}
+    </div>
+  );
+};
+
+const JobsPage = () => {
+  const [jobs, setJobs] = useState<any[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [showModal, setShowModal] = useState(false);
+  const [formData, setFormData] = useState({ title: '', department: '', location: '', type: '', description: '' });
+
+  useEffect(() => {
+    fetchJobs();
+  }, []);
+
+  const fetchJobs = async () => {
+    try {
+      setLoading(true);
+      const res = await AdminService.getJobs();
+      if (res.success) {
+        setJobs(res.data);
+      }
+    } catch (err) {
+      console.error('Failed to fetch jobs', err);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleCreateJob = async () => {
+    try {
+      await AdminService.createJob(formData);
+      setShowModal(false);
+      fetchJobs();
+      setFormData({ title: '', department: '', location: '', type: '', description: '' });
+    } catch (err) {
+      console.error('Failed to create job', err);
+    }
+  };
+
+  const handleDeleteJob = async (id: number) => {
+    if (!window.confirm('Are you sure you want to delete this job?')) return;
+    try {
+      await AdminService.deleteJob(id);
+      fetchJobs();
+    } catch (err) {
+      console.error('Failed to delete job', err);
+    }
+  };
+
+  return (
+    <div className="card">
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1rem' }}>
+        <h2>Careers (Jobs)</h2>
+        <button className="btn btn-primary" onClick={() => setShowModal(true)}>Post Job</button>
+      </div>
+
+      {showModal && (
+        <div style={{ padding: '1rem', border: '1px solid var(--border-color)', borderRadius: '8px', marginBottom: '1rem' }}>
+          <h3>Create New Job Post</h3>
+          <input type="text" placeholder="Title" value={formData.title} onChange={e => setFormData({ ...formData, title: e.target.value })} className="input-field" style={{ width: '100%', marginBottom: '0.5rem', padding: '0.5rem' }} />
+          <input type="text" placeholder="Department" value={formData.department} onChange={e => setFormData({ ...formData, department: e.target.value })} className="input-field" style={{ width: '100%', marginBottom: '0.5rem', padding: '0.5rem' }} />
+          <input type="text" placeholder="Location" value={formData.location} onChange={e => setFormData({ ...formData, location: e.target.value })} className="input-field" style={{ width: '100%', marginBottom: '0.5rem', padding: '0.5rem' }} />
+          <input type="text" placeholder="Type (e.g., Full-time)" value={formData.type} onChange={e => setFormData({ ...formData, type: e.target.value })} className="input-field" style={{ width: '100%', marginBottom: '0.5rem', padding: '0.5rem' }} />
+          <textarea placeholder="Description" value={formData.description} onChange={e => setFormData({ ...formData, description: e.target.value })} className="input-field" style={{ width: '100%', marginBottom: '0.5rem', padding: '0.5rem', minHeight: '80px' }}></textarea>
+          <div style={{ display: 'flex', gap: '0.5rem' }}>
+            <button className="btn btn-primary" onClick={handleCreateJob}>Submit</button>
+            <button className="btn btn-danger" onClick={() => setShowModal(false)} style={{ background: '#666' }}>Cancel</button>
+          </div>
+        </div>
+      )}
+
+      {loading ? (
+        <p>Loading...</p>
+      ) : (
+        <table className="table">
+          <thead>
+            <tr>
+              <th>Title</th>
+              <th>Department</th>
+              <th>Location</th>
+              <th>Type</th>
+              <th>Status</th>
+              <th>Actions</th>
+            </tr>
+          </thead>
+          <tbody>
+            {jobs.map((job: any) => (
+              <tr key={job.id}>
+                <td>{job.title}</td>
+                <td>{job.department}</td>
+                <td>{job.location}</td>
+                <td>{job.type}</td>
+                <td>{job.isActive ? 'Active' : 'Inactive'}</td>
+                <td>
+                  <button className="btn btn-danger" onClick={() => handleDeleteJob(job.id)} style={{ padding: '4px 8px', fontSize: '12px' }}>Delete</button>
+                </td>
+              </tr>
+            ))}
+            {jobs.length === 0 && (
+              <tr>
+                <td colSpan={6} style={{ textAlign: 'center' }}>No jobs found</td>
+              </tr>
+            )}
+          </tbody>
+        </table>
+      )}
+    </div>
+  );
+};
+
 function App() {
   const [isAuthenticated, setIsAuthenticated] = useState(!!localStorage.getItem('admin_token'));
 
@@ -871,6 +1041,8 @@ function App() {
               <Route path="/bulk-email" element={<BulkEmailPage />} />
               <Route path="/tickets" element={<TicketsPage />} />
               <Route path="/create-profile" element={<CreateProfilePage />} />
+              <Route path="/feedback" element={<FeedbackPage />} />
+              <Route path="/jobs" element={<JobsPage />} />
             </Routes>
           </div>
         </main>

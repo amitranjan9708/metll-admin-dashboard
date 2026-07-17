@@ -32,6 +32,16 @@ export const AdminService = {
     return response.data;
   },
 
+  getAmbassadors: async () => {
+    const response = await api.get('/admin/ambassadors');
+    return response.data;
+  },
+
+  toggleAmbassador: async (userId: number, isAmbassador: boolean) => {
+    const response = await api.put(`/admin/users/${userId}/ambassador`, { isAmbassador });
+    return response.data;
+  },
+
   getTickets: async () => {
     const response = await api.get('/admin/tickets');
     return response.data;

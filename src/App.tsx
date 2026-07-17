@@ -24,6 +24,14 @@ import {
 import { api, AdminService } from './services/api';
 import './App.css';
 
+const parseJwt = (token: string) => {
+  try {
+    return JSON.parse(atob(token.split('.')[1]));
+  } catch (e) {
+    return null;
+  }
+};
+
 // Login Component
 const Login = ({ onLogin }: { onLogin: (token: string) => void }) => {
   const [email, setEmail] = useState('');
@@ -52,7 +60,12 @@ const Login = ({ onLogin }: { onLogin: (token: string) => void }) => {
       const res = await api.post('/auth/verify-otp', { email, otp });
       const token = res.data?.data?.token;
       if (token) {
-        onLogin(token);
+        const payload = parseJwt(token);
+        if (payload && (payload.isAdmin || payload.isAmbassador)) {
+          onLogin(token);
+        } else {
+          setError('Access Denied: You must be an Admin or Campus Ambassador.');
+        }
       } else {
         setError('No token received in response');
       }
@@ -125,8 +138,8 @@ const Login = ({ onLogin }: { onLogin: (token: string) => void }) => {
 };
 
 // Layout Component
-const Sidebar = ({ onLogout }: { onLogout: () => void }) => {
-  const menuItems = [
+const Sidebar = ({ onLogout, isAmbassadorOnly }: { onLogout: () => void, isAmbassadorOnly: boolean }) => {
+  const allMenuItems = [
     { path: '/', icon: <LayoutDashboard size={20} />, label: 'Overview' },
     { path: '/users', icon: <Users size={20} />, label: 'Users' },
     { path: '/matching', icon: <Heart size={20} />, label: 'Matching & Likes' },
@@ -138,7 +151,12 @@ const Sidebar = ({ onLogout }: { onLogout: () => void }) => {
     { path: '/feedback', icon: <MessageCircle size={20} />, label: 'User Feedback' },
     { path: '/jobs', icon: <Briefcase size={20} />, label: 'Careers (Jobs)' },
     { path: '/push-notifications', icon: <Bell size={20} />, label: 'Push Notifications' },
+    { path: '/ambassadors', icon: <Users size={20} />, label: 'Ambassadors' },
   ];
+
+  const menuItems = isAmbassadorOnly
+    ? [{ path: '/', icon: <Users size={20} />, label: 'My Referrals' }]
+    : allMenuItems;
 
   return (
     <div className="sidebar">
@@ -168,9 +186,10 @@ const Sidebar = ({ onLogout }: { onLogout: () => void }) => {
   );
 };
 
-const Topnav = () => {
+const Topnav = ({ isAmbassadorOnly }: { isAmbassadorOnly: boolean }) => {
   const location = useLocation();
   const getPageTitle = () => {
+    if (isAmbassadorOnly) return 'Campus Ambassador Dashboard';
     switch(location.pathname) {
       case '/': return 'Dashboard Overview';
       case '/users': return 'User Management';
@@ -179,8 +198,11 @@ const Topnav = () => {
       case '/subscriptions': return 'Subscriptions & Payments';
       case '/bulk-email': return 'Bulk Email';
       case '/tickets': return 'Support Tickets';
-      case '/create-profile': return 'Create New Profile';
+      case '/create-profile': return 'Create AI Profile';
+      case '/feedback': return 'User Feedback';
+      case '/jobs': return 'Careers (Jobs)';
       case '/push-notifications': return 'Push Notifications';
+      case '/ambassadors': return 'Campus Ambassadors';
       default: return 'Admin Dashboard';
     }
   };
@@ -251,8 +273,12 @@ const UsersPage = () => {
   const [users, setUsers] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
 
-  useEffect(() => {
+  const fetchUsers = () => {
     AdminService.getUsers().then(res => setUsers(res.users)).finally(() => setLoading(false));
+  };
+
+  useEffect(() => {
+    fetchUsers();
   }, []);
 
   const handleUpdate = async (userId: number, field: string, value: any) => {
@@ -280,9 +306,10 @@ const UsersPage = () => {
                 <th>Name</th>
                 <th>Email / Phone</th>
                 <th>Onboarded</th>
-                <th>Verified</th>
-                <th>Verif. Status</th>
+                <th>Status</th>
+                <th>Ver. Status</th>
                 <th>Admin</th>
+                <th>Ambassador</th>
                 <th>Referrals</th>
                 <th>Joined</th>
                 <th>Last Active</th>
@@ -349,12 +376,100 @@ const UsersPage = () => {
                     </select>
                   </td>
                   <td>
+                    <select 
+                      value={user.isAmbassador ? 'true' : 'false'}
+                      onChange={(e) => AdminService.toggleAmbassador(user.id, e.target.value === 'true').then(() => fetchUsers())}
+                      style={{ padding: '0.25rem', borderRadius: '4px', background: 'var(--bg-card)', color: 'var(--text-primary)', border: '1px solid var(--border-color)' }}
+                    >
+                      <option value="true">Yes</option>
+                      <option value="false">No</option>
+                    </select>
+                  </td>
+                  <td>
                     <span className="badge badge-success" style={{background: 'var(--bg-sidebar)'}}>{user.totalReferrals || 0}</span>
                   </td>
                   <td style={{fontSize: '13px'}}>{new Date(user.createdAt).toLocaleDateString()}</td>
                   <td style={{fontSize: '13px'}}>{new Date(user.lastActiveAt).toLocaleDateString()}</td>
                 </tr>
               ))}
+            </tbody>
+          </table>
+        )}
+      </div>
+    </div>
+  );
+};
+
+const AmbassadorsPage = () => {
+  const [ambassadors, setAmbassadors] = useState<any[]>([]);
+  const [loading, setLoading] = useState(true);
+
+  const fetchAmbassadors = () => {
+    AdminService.getAmbassadors().then(res => setAmbassadors(res.data)).finally(() => setLoading(false));
+  };
+
+  useEffect(() => {
+    fetchAmbassadors();
+  }, []);
+
+  const handleRevoke = async (userId: number) => {
+    if (confirm('Are you sure you want to revoke ambassador status for this user?')) {
+      await AdminService.toggleAmbassador(userId, false);
+      fetchAmbassadors();
+    }
+  };
+
+  return (
+    <div className="card">
+      <h2>Campus Ambassadors</h2>
+      <p style={{ color: 'var(--text-secondary)', marginBottom: '1rem' }}>
+        Manage users who have the Campus Ambassador role. These users have standard referral codes but do not earn coffee dates.
+      </p>
+      <div className="table-container" style={{ marginTop: '1.5rem' }}>
+        {loading ? <p>Loading ambassadors...</p> : (
+          <table>
+            <thead>
+              <tr>
+                <th>ID</th>
+                <th>Name</th>
+                <th>Email / Phone</th>
+                <th>Referral Code</th>
+                <th>Total Referrals</th>
+                <th>Joined</th>
+                <th>Actions</th>
+              </tr>
+            </thead>
+            <tbody>
+              {ambassadors.map(user => (
+                <tr key={user.id}>
+                  <td><span style={{color: 'var(--text-secondary)', fontSize: '12px'}}>#{user.id}</span></td>
+                  <td>{user.name || 'N/A'}</td>
+                  <td>
+                    <div style={{ fontSize: '14px' }}>{user.email}</div>
+                    <div style={{ fontSize: '12px', color: 'var(--text-secondary)' }}>{user.phoneNumber}</div>
+                  </td>
+                  <td>
+                    <span className="badge" style={{background: 'var(--accent)', color: 'white'}}>{user.referralCode}</span>
+                  </td>
+                  <td>
+                    <span className="badge badge-success" style={{background: 'var(--bg-sidebar)'}}>{user.totalReferrals || 0}</span>
+                  </td>
+                  <td style={{fontSize: '13px'}}>{new Date(user.createdAt).toLocaleDateString()}</td>
+                  <td>
+                    <button 
+                      onClick={() => handleRevoke(user.id)}
+                      style={{ padding: '0.25rem 0.5rem', background: '#e74c3c', color: 'white', border: 'none', borderRadius: '4px', cursor: 'pointer' }}
+                    >
+                      Revoke
+                    </button>
+                  </td>
+                </tr>
+              ))}
+              {ambassadors.length === 0 && (
+                <tr>
+                  <td colSpan={7} style={{ textAlign: 'center', padding: '2rem' }}>No ambassadors found. Promote a user from the Users tab.</td>
+                </tr>
+              )}
             </tbody>
           </table>
         )}
@@ -1676,6 +1791,19 @@ const PushNotificationsPage = () => {
 
 function App() {
   const [isAuthenticated, setIsAuthenticated] = useState(!!localStorage.getItem('admin_token'));
+  const [isAmbassadorOnly, setIsAmbassadorOnly] = useState(false);
+
+  useEffect(() => {
+    const token = localStorage.getItem('admin_token');
+    if (token) {
+      const payload = parseJwt(token);
+      if (payload && payload.isAmbassador && !payload.isAdmin) {
+        setIsAmbassadorOnly(true);
+      } else {
+        setIsAmbassadorOnly(false);
+      }
+    }
+  }, [isAuthenticated]);
 
   const handleLogin = (token: string) => {
     localStorage.setItem('admin_token', token);
@@ -1694,22 +1822,32 @@ function App() {
   return (
     <Router>
       <div className="dashboard-layout">
-        <Sidebar onLogout={handleLogout} />
+        <Sidebar onLogout={handleLogout} isAmbassadorOnly={isAmbassadorOnly} />
         <main className="main-content">
-          <Topnav />
+          <Topnav isAmbassadorOnly={isAmbassadorOnly} />
           <div className="content-scrollable">
             <Routes>
-              <Route path="/" element={<Overview />} />
-              <Route path="/users" element={<UsersPage />} />
-              <Route path="/matching" element={<MatchingPage />} />
-              <Route path="/chats" element={<ChatsPage />} />
-              <Route path="/subscriptions" element={<SubscriptionsPage />} />
-              <Route path="/bulk-email" element={<BulkEmailPage />} />
-              <Route path="/tickets" element={<TicketsPage />} />
-              <Route path="/create-profile" element={<CreateProfilePage />} />
-              <Route path="/feedback" element={<FeedbackPage />} />
-              <Route path="/jobs" element={<JobsPage />} />
-              <Route path="/push-notifications" element={<PushNotificationsPage />} />
+              {isAmbassadorOnly ? (
+                <>
+                  <Route path="/" element={<AmbassadorsPage />} />
+                  <Route path="*" element={<AmbassadorsPage />} />
+                </>
+              ) : (
+                <>
+                  <Route path="/" element={<Overview />} />
+                  <Route path="/users" element={<UsersPage />} />
+                  <Route path="/matching" element={<MatchingPage />} />
+                  <Route path="/chats" element={<ChatsPage />} />
+                  <Route path="/subscriptions" element={<SubscriptionsPage />} />
+                  <Route path="/bulk-email" element={<BulkEmailPage />} />
+                  <Route path="/tickets" element={<TicketsPage />} />
+                  <Route path="/create-profile" element={<CreateProfilePage />} />
+                  <Route path="/feedback" element={<FeedbackPage />} />
+                  <Route path="/jobs" element={<JobsPage />} />
+                  <Route path="/push-notifications" element={<PushNotificationsPage />} />
+                  <Route path="/ambassadors" element={<AmbassadorsPage />} />
+                </>
+              )}
             </Routes>
           </div>
         </main>

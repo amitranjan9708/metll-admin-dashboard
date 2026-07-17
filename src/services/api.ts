@@ -88,5 +88,46 @@ export const AdminService = {
   getJobApplications: async (jobId: number) => {
     const response = await api.get(`/admin/jobs/${jobId}/applications`);
     return response.data;
-  }
+  },
+
+  // ── Push Notification Broadcasts ──────────────────────────────────────────
+
+  getBroadcastStats: async () => {
+    const response = await api.get('/admin/notifications/stats');
+    return response.data;
+  },
+
+  getBroadcasts: async (page = 1, limit = 20) => {
+    const response = await api.get(`/admin/notifications/broadcasts?page=${page}&limit=${limit}`);
+    return response.data;
+  },
+
+  getBroadcastById: async (id: number) => {
+    const response = await api.get(`/admin/notifications/broadcasts/${id}`);
+    return response.data;
+  },
+
+  getUserCount: async (targetType: string, targetUserIds?: number[], filters?: Record<string, any>) => {
+    let url = `/admin/notifications/user-count?targetType=${targetType}`;
+    if (targetUserIds && targetUserIds.length > 0) url += `&targetUserIds=${targetUserIds.join(',')}`;
+    if (filters) url += `&filters=${encodeURIComponent(JSON.stringify(filters))}`;
+    const response = await api.get(url);
+    return response.data;
+  },
+
+  sendBroadcast: async (payload: {
+    title: string;
+    body: string;
+    imageUrl?: string;
+    deepLink?: string;
+    data?: Record<string, string>;
+    priority?: string;
+    targetType: 'all' | 'specific' | 'filtered';
+    targetUserIds?: number[];
+    filters?: Record<string, any>;
+  }) => {
+    const response = await api.post('/admin/notifications/broadcast', payload);
+    return response.data;
+  },
 };
+

@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useState, useRef, useCallback } from 'react';
 import { BrowserRouter as Router, Routes, Route, NavLink, useLocation } from 'react-router-dom';
 import { 
   LayoutDashboard, 
@@ -12,7 +12,14 @@ import {
   Mail,
   UserPlus,
   Briefcase,
-  MessageCircle
+  MessageCircle,
+  Bell,
+  Send,
+  Filter,
+  CheckCircle,
+  XCircle,
+  Clock,
+  Zap
 } from 'lucide-react';
 import { api, AdminService } from './services/api';
 import './App.css';
@@ -130,6 +137,7 @@ const Sidebar = ({ onLogout }: { onLogout: () => void }) => {
     { path: '/create-profile', icon: <UserPlus size={20} />, label: 'Create Profile' },
     { path: '/feedback', icon: <MessageCircle size={20} />, label: 'User Feedback' },
     { path: '/jobs', icon: <Briefcase size={20} />, label: 'Careers (Jobs)' },
+    { path: '/push-notifications', icon: <Bell size={20} />, label: 'Push Notifications' },
   ];
 
   return (
@@ -172,6 +180,7 @@ const Topnav = () => {
       case '/bulk-email': return 'Bulk Email';
       case '/tickets': return 'Support Tickets';
       case '/create-profile': return 'Create New Profile';
+      case '/push-notifications': return 'Push Notifications';
       default: return 'Admin Dashboard';
     }
   };
@@ -1139,6 +1148,532 @@ const JobsPage = () => {
   );
 };
 
+// ─────────────────────────────────────────────────────────
+// Push Notifications Page
+// ─────────────────────────────────────────────────────────
+const PushNotificationsPage = () => {
+  const [stats, setStats] = useState<any>(null);
+  const [broadcasts, setBroadcasts] = useState<any[]>([]);
+  const [loadingStats, setLoadingStats] = useState(true);
+  const [loadingHistory, setLoadingHistory] = useState(true);
+
+  // Form state
+  const [form, setForm] = useState({
+    title: '',
+    body: '',
+    imageUrl: '',
+    deepLink: '',
+    priority: 'high',
+    targetType: 'all' as 'all' | 'specific' | 'filtered',
+    specificIds: '',
+  });
+  const [filters, setFilters] = useState({
+    gender: [] as string[],
+    ageMin: '',
+    ageMax: '',
+    city: '',
+    verifiedOnly: false,
+    platforms: [] as string[],
+    activeWithinDays: '',
+    onboardedOnly: false,
+  });
+
+  // Custom data key-value pairs
+  const [customData, setCustomData] = useState<{ key: string; value: string }[]>([]);
+
+  // Live user count preview
+  const [userCount, setUserCount] = useState<number | null>(null);
+  const [countLoading, setCountLoading] = useState(false);
+  const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  // Sending state
+  const [sending, setSending] = useState(false);
+  const [sendResult, setSendResult] = useState<{ success: boolean; message: string } | null>(null);
+  const [showConfirm, setShowConfirm] = useState(false);
+
+  // Detail view
+  const [selectedBroadcast, setSelectedBroadcast] = useState<any>(null);
+
+  // Load stats + history
+  useEffect(() => {
+    AdminService.getBroadcastStats()
+      .then(res => setStats(res.data))
+      .catch(console.error)
+      .finally(() => setLoadingStats(false));
+
+    AdminService.getBroadcasts()
+      .then(res => setBroadcasts(res.data?.broadcasts || []))
+      .catch(console.error)
+      .finally(() => setLoadingHistory(false));
+  }, []);
+
+  // Debounced user count fetch
+  const fetchUserCount = useCallback(() => {
+    if (debounceRef.current) clearTimeout(debounceRef.current);
+    debounceRef.current = setTimeout(async () => {
+      setCountLoading(true);
+      try {
+        const parsedFilters: Record<string, any> = {};
+        if (form.targetType === 'filtered') {
+          if (filters.gender.length > 0) parsedFilters.gender = filters.gender;
+          if (filters.ageMin) parsedFilters.ageMin = parseInt(filters.ageMin);
+          if (filters.ageMax) parsedFilters.ageMax = parseInt(filters.ageMax);
+          if (filters.city) parsedFilters.city = filters.city;
+          if (filters.verifiedOnly) parsedFilters.verifiedOnly = true;
+          if (filters.platforms.length > 0) parsedFilters.platforms = filters.platforms;
+          if (filters.activeWithinDays) parsedFilters.activeWithinDays = parseInt(filters.activeWithinDays);
+          if (filters.onboardedOnly) parsedFilters.onboardedOnly = true;
+        }
+        const specificIds =
+          form.targetType === 'specific'
+            ? form.specificIds.split(',').map(s => parseInt(s.trim())).filter(Boolean)
+            : [];
+        const res = await AdminService.getUserCount(
+          form.targetType,
+          specificIds.length > 0 ? specificIds : undefined,
+          Object.keys(parsedFilters).length > 0 ? parsedFilters : undefined
+        );
+        setUserCount(res.data?.count ?? null);
+      } catch {
+        setUserCount(null);
+      } finally {
+        setCountLoading(false);
+      }
+    }, 600);
+  }, [form, filters]);
+
+  useEffect(() => { fetchUserCount(); }, [fetchUserCount]);
+
+  const handleSend = async () => {
+    setSending(true);
+    setSendResult(null);
+    setShowConfirm(false);
+    try {
+      const dataMap: Record<string, string> = {};
+      customData.forEach(({ key, value }) => { if (key) dataMap[key] = value; });
+
+      const parsedFilters: Record<string, any> = {};
+      if (form.targetType === 'filtered') {
+        if (filters.gender.length > 0) parsedFilters.gender = filters.gender;
+        if (filters.ageMin) parsedFilters.ageMin = parseInt(filters.ageMin);
+        if (filters.ageMax) parsedFilters.ageMax = parseInt(filters.ageMax);
+        if (filters.city) parsedFilters.city = filters.city;
+        if (filters.verifiedOnly) parsedFilters.verifiedOnly = true;
+        if (filters.platforms.length > 0) parsedFilters.platforms = filters.platforms;
+        if (filters.activeWithinDays) parsedFilters.activeWithinDays = parseInt(filters.activeWithinDays);
+        if (filters.onboardedOnly) parsedFilters.onboardedOnly = true;
+      }
+
+      const specificIds =
+        form.targetType === 'specific'
+          ? form.specificIds.split(',').map(s => parseInt(s.trim())).filter(Boolean)
+          : undefined;
+
+      await AdminService.sendBroadcast({
+        title: form.title,
+        body: form.body,
+        imageUrl: form.imageUrl || undefined,
+        deepLink: form.deepLink || undefined,
+        data: Object.keys(dataMap).length > 0 ? dataMap : undefined,
+        priority: form.priority,
+        targetType: form.targetType,
+        targetUserIds: specificIds,
+        filters: Object.keys(parsedFilters).length > 0 ? parsedFilters : undefined,
+      });
+
+      setSendResult({ success: true, message: `Broadcast queued! Sending to ~${userCount ?? '?'} users.` });
+
+      // Reset form
+      setForm({ title: '', body: '', imageUrl: '', deepLink: '', priority: 'high', targetType: 'all', specificIds: '' });
+      setFilters({ gender: [], ageMin: '', ageMax: '', city: '', verifiedOnly: false, platforms: [], activeWithinDays: '', onboardedOnly: false });
+      setCustomData([]);
+
+      // Refresh history
+      const hRes = await AdminService.getBroadcasts();
+      setBroadcasts(hRes.data?.broadcasts || []);
+
+      // Refresh stats
+      const sRes = await AdminService.getBroadcastStats();
+      setStats(sRes.data);
+    } catch (err: any) {
+      setSendResult({ success: false, message: err.response?.data?.message || 'Failed to send broadcast' });
+    } finally {
+      setSending(false);
+    }
+  };
+
+  const toggleGender = (g: string) =>
+    setFilters(f => ({ ...f, gender: f.gender.includes(g) ? f.gender.filter(x => x !== g) : [...f.gender, g] }));
+
+  const togglePlatform = (p: string) =>
+    setFilters(f => ({ ...f, platforms: f.platforms.includes(p) ? f.platforms.filter(x => x !== p) : [...f.platforms, p] }));
+
+  const inputStyle: React.CSSProperties = {
+    width: '100%', padding: '0.6rem 0.75rem', borderRadius: '8px',
+    border: '1px solid var(--border-color)', fontSize: '14px',
+    background: 'var(--bg-color)', color: 'var(--text-primary)', outline: 'none',
+  };
+  const labelStyle: React.CSSProperties = {
+    display: 'block', fontSize: '13px', fontWeight: 600,
+    color: 'var(--text-secondary)', marginBottom: '6px',
+  };
+  const chipStyle = (active: boolean): React.CSSProperties => ({
+    display: 'inline-flex', alignItems: 'center', gap: '4px',
+    padding: '4px 12px', borderRadius: '20px', fontSize: '12px', fontWeight: 600,
+    cursor: 'pointer', border: '1px solid',
+    background: active ? 'var(--accent)' : 'transparent',
+    color: active ? '#fff' : 'var(--text-secondary)',
+    borderColor: active ? 'var(--accent)' : 'var(--border-color)',
+    transition: 'all 0.15s',
+  });
+
+  const statusBadge = (status: string) => {
+    const map: Record<string, { color: string; icon: React.ReactNode }> = {
+      done: { color: 'var(--success)', icon: <CheckCircle size={12} /> },
+      sending: { color: 'var(--warning)', icon: <Clock size={12} /> },
+      pending: { color: 'var(--text-secondary)', icon: <Clock size={12} /> },
+      failed: { color: 'var(--danger)', icon: <XCircle size={12} /> },
+    };
+    const s = map[status] || map.pending;
+    return (
+      <span style={{ display: 'inline-flex', alignItems: 'center', gap: '4px', color: s.color, fontWeight: 600, fontSize: '12px' }}>
+        {s.icon} {status}
+      </span>
+    );
+  };
+
+  return (
+    <div style={{ display: 'flex', flexDirection: 'column', gap: '1.5rem' }}>
+
+      {/* Stats Row */}
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))', gap: '1rem' }}>
+        {[
+          { label: 'Total Broadcasts', value: loadingStats ? '...' : stats?.totalBroadcasts ?? 0, icon: <Bell size={18} color="var(--accent)" /> },
+          { label: 'Notifications Sent Today', value: loadingStats ? '...' : stats?.notificationsSentToday ?? 0, icon: <Send size={18} color="var(--success)" /> },
+          { label: 'Total Sent (All Time)', value: loadingStats ? '...' : stats?.totalNotificationsSent ?? 0, icon: <Zap size={18} color="var(--warning)" /> },
+          { label: 'Active FCM Tokens', value: loadingStats ? '...' : stats?.activeFcmTokens ?? 0, icon: <Activity size={18} color="#9b59b6" /> },
+        ].map(stat => (
+          <div key={stat.label} className="card" style={{ display: 'flex', alignItems: 'center', gap: '1rem' }}>
+            <div style={{ padding: '10px', borderRadius: '10px', background: 'var(--bg-color)' }}>{stat.icon}</div>
+            <div>
+              <div style={{ fontSize: '22px', fontWeight: 700 }}>{stat.value}</div>
+              <div style={{ fontSize: '12px', color: 'var(--text-secondary)' }}>{stat.label}</div>
+            </div>
+          </div>
+        ))}
+      </div>
+
+      {/* Main 2-column layout */}
+      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1.2fr', gap: '1.5rem', alignItems: 'start' }}>
+
+        {/* ── Compose Form ── */}
+        <div className="card">
+          <h3 style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '1.25rem' }}>
+            <Bell size={18} color="var(--accent)" /> Compose Broadcast
+          </h3>
+
+          {sendResult && (
+            <div style={{
+              padding: '0.75rem 1rem', borderRadius: '8px', marginBottom: '1rem', fontSize: '14px',
+              background: sendResult.success ? 'rgba(46,186,117,0.1)' : 'rgba(255,75,75,0.1)',
+              color: sendResult.success ? 'var(--success)' : 'var(--danger)',
+              border: `1px solid ${sendResult.success ? 'var(--success)' : 'var(--danger)'}`,
+            }}>
+              {sendResult.message}
+            </div>
+          )}
+
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
+            <div>
+              <label style={labelStyle}>Title *</label>
+              <input id="pn-title" style={inputStyle} placeholder="e.g. New Feature Announcement 🎉"
+                value={form.title} maxLength={100}
+                onChange={e => setForm(f => ({ ...f, title: e.target.value }))} />
+              <div style={{ fontSize: '11px', color: 'var(--text-secondary)', marginTop: '3px', textAlign: 'right' }}>{form.title.length}/100</div>
+            </div>
+
+            <div>
+              <label style={labelStyle}>Body *</label>
+              <textarea id="pn-body" style={{ ...inputStyle, minHeight: '90px', resize: 'vertical' }}
+                placeholder="Write your message here..."
+                value={form.body} maxLength={500}
+                onChange={e => setForm(f => ({ ...f, body: e.target.value }))} />
+              <div style={{ fontSize: '11px', color: 'var(--text-secondary)', marginTop: '3px', textAlign: 'right' }}>{form.body.length}/500</div>
+            </div>
+
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.75rem' }}>
+              <div>
+                <label style={labelStyle}>Image URL (optional)</label>
+                <input id="pn-image" style={inputStyle} placeholder="https://..." value={form.imageUrl}
+                  onChange={e => setForm(f => ({ ...f, imageUrl: e.target.value }))} />
+              </div>
+              <div>
+                <label style={labelStyle}>Deep Link (optional)</label>
+                <input id="pn-deeplink" style={inputStyle} placeholder="e.g. matches, home" value={form.deepLink}
+                  onChange={e => setForm(f => ({ ...f, deepLink: e.target.value }))} />
+              </div>
+            </div>
+
+            <div>
+              <label style={labelStyle}>Priority</label>
+              <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap' }}>
+                {['critical', 'high', 'medium', 'low'].map(p => (
+                  <button key={p} style={chipStyle(form.priority === p)} onClick={() => setForm(f => ({ ...f, priority: p }))}>{p}</button>
+                ))}
+              </div>
+            </div>
+
+            {/* Target Selector */}
+            <div>
+              <label style={labelStyle}>Target Audience</label>
+              <div style={{ display: 'flex', gap: '8px' }}>
+                {(['all', 'specific', 'filtered'] as const).map(t => (
+                  <button key={t} style={chipStyle(form.targetType === t)}
+                    onClick={() => setForm(f => ({ ...f, targetType: t }))}>
+                    {t === 'all' && '🌐'} {t === 'specific' && '👤'} {t === 'filtered' && <Filter size={12} />}
+                    {' '}{t.charAt(0).toUpperCase() + t.slice(1)}
+                  </button>
+                ))}
+              </div>
+            </div>
+
+            {/* Specific IDs */}
+            {form.targetType === 'specific' && (
+              <div>
+                <label style={labelStyle}>User IDs (comma separated)</label>
+                <input id="pn-ids" style={inputStyle} placeholder="e.g. 12, 45, 103"
+                  value={form.specificIds}
+                  onChange={e => setForm(f => ({ ...f, specificIds: e.target.value }))} />
+              </div>
+            )}
+
+            {/* Filtered options */}
+            {form.targetType === 'filtered' && (
+              <div style={{ background: 'var(--bg-color)', borderRadius: '10px', padding: '1rem', display: 'flex', flexDirection: 'column', gap: '0.85rem' }}>
+                <div style={{ fontSize: '13px', fontWeight: 700, color: 'var(--accent)', display: 'flex', alignItems: 'center', gap: '6px' }}>
+                  <Filter size={14} /> Segment Filters
+                </div>
+
+                <div>
+                  <label style={labelStyle}>Gender</label>
+                  <div style={{ display: 'flex', gap: '6px', flexWrap: 'wrap' }}>
+                    {['male', 'female', 'non-binary', 'other'].map(g => (
+                      <button key={g} style={chipStyle(filters.gender.includes(g))} onClick={() => toggleGender(g)}>{g}</button>
+                    ))}
+                  </div>
+                </div>
+
+                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.75rem' }}>
+                  <div>
+                    <label style={labelStyle}>Min Age</label>
+                    <input style={inputStyle} type="number" min={18} max={100} placeholder="18"
+                      value={filters.ageMin} onChange={e => setFilters(f => ({ ...f, ageMin: e.target.value }))} />
+                  </div>
+                  <div>
+                    <label style={labelStyle}>Max Age</label>
+                    <input style={inputStyle} type="number" min={18} max={100} placeholder="60"
+                      value={filters.ageMax} onChange={e => setFilters(f => ({ ...f, ageMax: e.target.value }))} />
+                  </div>
+                </div>
+
+                <div>
+                  <label style={labelStyle}>City (contains)</label>
+                  <input style={inputStyle} placeholder="e.g. Mumbai" value={filters.city}
+                    onChange={e => setFilters(f => ({ ...f, city: e.target.value }))} />
+                </div>
+
+                <div>
+                  <label style={labelStyle}>Platform</label>
+                  <div style={{ display: 'flex', gap: '6px' }}>
+                    {['android', 'ios', 'web'].map(p => (
+                      <button key={p} style={chipStyle(filters.platforms.includes(p))} onClick={() => togglePlatform(p)}>{p}</button>
+                    ))}
+                  </div>
+                </div>
+
+                <div>
+                  <label style={labelStyle}>Active within (days)</label>
+                  <input style={inputStyle} type="number" placeholder="e.g. 30" value={filters.activeWithinDays}
+                    onChange={e => setFilters(f => ({ ...f, activeWithinDays: e.target.value }))} />
+                </div>
+
+                <div style={{ display: 'flex', gap: '1.5rem' }}>
+                  <label style={{ display: 'flex', alignItems: 'center', gap: '6px', fontSize: '13px', cursor: 'pointer' }}>
+                    <input type="checkbox" checked={filters.verifiedOnly}
+                      onChange={e => setFilters(f => ({ ...f, verifiedOnly: e.target.checked }))} />
+                    Verified users only
+                  </label>
+                  <label style={{ display: 'flex', alignItems: 'center', gap: '6px', fontSize: '13px', cursor: 'pointer' }}>
+                    <input type="checkbox" checked={filters.onboardedOnly}
+                      onChange={e => setFilters(f => ({ ...f, onboardedOnly: e.target.checked }))} />
+                    Onboarded only
+                  </label>
+                </div>
+              </div>
+            )}
+
+            {/* Custom data pairs */}
+            <div>
+              <label style={labelStyle}>Custom Data (optional)</label>
+              {customData.map((pair, i) => (
+                <div key={i} style={{ display: 'flex', gap: '8px', marginBottom: '6px' }}>
+                  <input style={{ ...inputStyle, flex: 1 }} placeholder="key" value={pair.key}
+                    onChange={e => setCustomData(d => d.map((x, j) => j === i ? { ...x, key: e.target.value } : x))} />
+                  <input style={{ ...inputStyle, flex: 2 }} placeholder="value" value={pair.value}
+                    onChange={e => setCustomData(d => d.map((x, j) => j === i ? { ...x, value: e.target.value } : x))} />
+                  <button onClick={() => setCustomData(d => d.filter((_, j) => j !== i))}
+                    style={{ background: 'none', border: 'none', color: 'var(--danger)', cursor: 'pointer', padding: '0 4px' }}>✕</button>
+                </div>
+              ))}
+              <button onClick={() => setCustomData(d => [...d, { key: '', value: '' }])}
+                style={{ fontSize: '12px', color: 'var(--accent)', background: 'none', border: 'none', cursor: 'pointer', padding: 0, marginTop: '4px' }}>+ Add field</button>
+            </div>
+
+            {/* Live user count */}
+            <div style={{
+              display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+              padding: '0.75rem 1rem', borderRadius: '8px',
+              background: 'linear-gradient(135deg, rgba(168,180,231,0.15), rgba(168,180,231,0.05))',
+              border: '1px solid var(--accent)',
+            }}>
+              <span style={{ fontSize: '13px', color: 'var(--text-secondary)' }}>Estimated recipients</span>
+              <span style={{ fontWeight: 700, fontSize: '20px', color: 'var(--accent)' }}>
+                {countLoading ? '...' : userCount !== null ? userCount.toLocaleString() : '—'}
+              </span>
+            </div>
+
+            {/* Send button */}
+            <button
+              id="pn-send-btn"
+              className="btn btn-primary"
+              style={{ justifyContent: 'center', gap: '8px', padding: '0.85rem', fontSize: '15px' }}
+              disabled={sending || !form.title || !form.body}
+              onClick={() => setShowConfirm(true)}
+            >
+              <Send size={16} /> {sending ? 'Sending...' : 'Send Broadcast'}
+            </button>
+          </div>
+        </div>
+
+        {/* ── History Table ── */}
+        <div className="card">
+          <h3 style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '1.25rem' }}>
+            <Clock size={18} color="var(--accent)" /> Broadcast History
+          </h3>
+
+          {loadingHistory ? (
+            <p style={{ color: 'var(--text-secondary)', fontSize: '14px' }}>Loading history...</p>
+          ) : broadcasts.length === 0 ? (
+            <p style={{ color: 'var(--text-secondary)', fontSize: '14px' }}>No broadcasts sent yet.</p>
+          ) : (
+            <div style={{ overflowX: 'auto' }}>
+              <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '13px' }}>
+                <thead>
+                  <tr>
+                    {['Title', 'Target', 'Sent', 'Failed', 'Status', 'Date'].map(h => (
+                      <th key={h} style={{ textAlign: 'left', padding: '8px 10px', borderBottom: '1px solid var(--border-color)', color: 'var(--text-secondary)', fontWeight: 600, fontSize: '12px' }}>{h}</th>
+                    ))}
+                  </tr>
+                </thead>
+                <tbody>
+                  {broadcasts.map((b: any) => (
+                    <tr key={b.id} style={{ borderBottom: '1px solid var(--border-color)', cursor: 'pointer' }}
+                      onClick={() => setSelectedBroadcast(b)}
+                      onMouseEnter={e => (e.currentTarget.style.background = 'var(--bg-color)')}
+                      onMouseLeave={e => (e.currentTarget.style.background = 'transparent')}>
+                      <td style={{ padding: '10px', maxWidth: '160px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                        <strong>{b.title}</strong>
+                        <div style={{ fontSize: '11px', color: 'var(--text-secondary)', marginTop: '2px' }}>{b.body.substring(0, 40)}...</div>
+                      </td>
+                      <td style={{ padding: '10px' }}>
+                        <span style={chipStyle(false)}>{b.targetType}</span>
+                      </td>
+                      <td style={{ padding: '10px', color: 'var(--success)', fontWeight: 700 }}>{b.sentCount}</td>
+                      <td style={{ padding: '10px', color: b.failCount > 0 ? 'var(--danger)' : 'var(--text-secondary)' }}>{b.failCount}</td>
+                      <td style={{ padding: '10px' }}>{statusBadge(b.status)}</td>
+                      <td style={{ padding: '10px', color: 'var(--text-secondary)', fontSize: '12px' }}>
+                        {new Date(b.createdAt).toLocaleDateString()}
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          )}
+        </div>
+      </div>
+
+      {/* ── Confirm Dialog ── */}
+      {showConfirm && (
+        <div style={{
+          position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.5)',
+          display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 1000,
+        }}>
+          <div className="card" style={{ maxWidth: '440px', width: '90%' }}>
+            <h3 style={{ marginBottom: '1rem' }}>⚠️ Confirm Broadcast</h3>
+            <p style={{ color: 'var(--text-secondary)', fontSize: '14px', marginBottom: '1rem' }}>
+              You're about to send <strong>"{form.title}"</strong> to approximately <strong>{userCount?.toLocaleString() ?? '?'} users</strong>.
+              This action cannot be undone.
+            </p>
+            <div style={{ display: 'flex', gap: '0.75rem', justifyContent: 'flex-end' }}>
+              <button style={{ padding: '0.6rem 1.2rem', borderRadius: '8px', border: '1px solid var(--border-color)', background: 'none', cursor: 'pointer' }}
+                onClick={() => setShowConfirm(false)}>Cancel</button>
+              <button className="btn btn-primary" style={{ padding: '0.6rem 1.5rem' }}
+                onClick={handleSend}>
+                <Send size={14} /> Yes, Send Now
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ── Broadcast Detail Modal ── */}
+      {selectedBroadcast && (
+        <div style={{
+          position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.5)',
+          display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 1000,
+        }}>
+          <div className="card" style={{ maxWidth: '520px', width: '90%', maxHeight: '80vh', overflow: 'auto' }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1rem' }}>
+              <h3>Broadcast Details</h3>
+              <button onClick={() => setSelectedBroadcast(null)}
+                style={{ background: 'none', border: 'none', fontSize: '20px', cursor: 'pointer', color: 'var(--text-secondary)' }}>×</button>
+            </div>
+            <table style={{ width: '100%', fontSize: '13px', borderCollapse: 'collapse' }}>
+              {[
+                ['ID', `#${selectedBroadcast.id}`],
+                ['Title', selectedBroadcast.title],
+                ['Body', selectedBroadcast.body],
+                ['Priority', selectedBroadcast.priority],
+                ['Target Type', selectedBroadcast.targetType],
+                ['Sent', selectedBroadcast.sentCount],
+                ['Failed', selectedBroadcast.failCount],
+                ['Status', selectedBroadcast.status],
+                ['Sent At', selectedBroadcast.sentAt ? new Date(selectedBroadcast.sentAt).toLocaleString() : 'N/A'],
+                ['Image URL', selectedBroadcast.imageUrl || 'None'],
+                ['Deep Link', selectedBroadcast.deepLink || 'None'],
+              ].map(([k, v]) => (
+                <tr key={String(k)} style={{ borderBottom: '1px solid var(--border-color)' }}>
+                  <td style={{ padding: '8px 10px', color: 'var(--text-secondary)', fontWeight: 600, whiteSpace: 'nowrap' }}>{k}</td>
+                  <td style={{ padding: '8px 10px' }}>{String(v)}</td>
+                </tr>
+              ))}
+            </table>
+            {selectedBroadcast.filters && (
+              <div style={{ marginTop: '1rem' }}>
+                <div style={labelStyle}>Filters Applied</div>
+                <pre style={{ fontSize: '12px', background: 'var(--bg-color)', padding: '0.75rem', borderRadius: '8px', overflow: 'auto' }}>
+                  {JSON.stringify(selectedBroadcast.filters, null, 2)}
+                </pre>
+              </div>
+            )}
+          </div>
+        </div>
+      )}
+    </div>
+  );
+};
+
 function App() {
   const [isAuthenticated, setIsAuthenticated] = useState(!!localStorage.getItem('admin_token'));
 
@@ -1174,6 +1709,7 @@ function App() {
               <Route path="/create-profile" element={<CreateProfilePage />} />
               <Route path="/feedback" element={<FeedbackPage />} />
               <Route path="/jobs" element={<JobsPage />} />
+              <Route path="/push-notifications" element={<PushNotificationsPage />} />
             </Routes>
           </div>
         </main>

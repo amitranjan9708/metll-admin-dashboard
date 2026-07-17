@@ -430,12 +430,12 @@ const AmbassadorsPage = ({ isAmbassadorOnly }: { isAmbassadorOnly?: boolean }) =
         <h2>My Referrals</h2>
         <div style={{ display: 'flex', gap: '2rem', marginBottom: '1.5rem', marginTop: '1rem' }}>
           <div style={{ background: 'var(--bg-sidebar)', padding: '1rem', borderRadius: '8px', minWidth: '150px' }}>
-            <div style={{ fontSize: '12px', color: 'var(--text-secondary)' }}>Total Referrals</div>
+            <div style={{ fontSize: '12px', color: 'rgba(255, 255, 255, 0.7)' }}>Total Referrals</div>
             <div style={{ fontSize: '24px', fontWeight: 600, color: 'var(--accent)' }}>{myReferralData?.totalReferrals || 0}</div>
           </div>
           <div style={{ background: 'var(--bg-sidebar)', padding: '1rem', borderRadius: '8px', minWidth: '150px' }}>
-            <div style={{ fontSize: '12px', color: 'var(--text-secondary)' }}>My Referral Code</div>
-            <div style={{ fontSize: '18px', fontWeight: 600, marginTop: '4px', color: 'var(--text-primary, #fff)' }}>{myReferralData?.referralCode || 'N/A'}</div>
+            <div style={{ fontSize: '12px', color: 'rgba(255, 255, 255, 0.7)' }}>My Referral Code</div>
+            <div style={{ fontSize: '18px', fontWeight: 600, marginTop: '4px', color: '#ffffff' }}>{myReferralData?.referralCode || 'N/A'}</div>
           </div>
         </div>
         <div className="table-container">

@@ -1847,7 +1847,15 @@ const PushNotificationsPage = () => {
 
 function App() {
   const [isAuthenticated, setIsAuthenticated] = useState(!!localStorage.getItem('admin_token'));
-  const [isAmbassadorOnly, setIsAmbassadorOnly] = useState(false);
+  
+  const [isAmbassadorOnly, setIsAmbassadorOnly] = useState(() => {
+    const token = localStorage.getItem('admin_token');
+    if (token) {
+      const payload = parseJwt(token);
+      return payload && payload.isAmbassador && !payload.isAdmin;
+    }
+    return false;
+  });
 
   useEffect(() => {
     const token = localStorage.getItem('admin_token');
@@ -1863,6 +1871,12 @@ function App() {
 
   const handleLogin = (token: string) => {
     localStorage.setItem('admin_token', token);
+    const payload = parseJwt(token);
+    if (payload && payload.isAmbassador && !payload.isAdmin) {
+      setIsAmbassadorOnly(true);
+    } else {
+      setIsAmbassadorOnly(false);
+    }
     setIsAuthenticated(true);
   };
 

@@ -435,7 +435,7 @@ const AmbassadorsPage = ({ isAmbassadorOnly }: { isAmbassadorOnly?: boolean }) =
           </div>
           <div style={{ background: 'var(--bg-sidebar)', padding: '1rem', borderRadius: '8px', minWidth: '150px' }}>
             <div style={{ fontSize: '12px', color: 'var(--text-secondary)' }}>My Referral Code</div>
-            <div style={{ fontSize: '18px', fontWeight: 600, marginTop: '4px' }}>{myReferralData?.referralCode || 'N/A'}</div>
+            <div style={{ fontSize: '18px', fontWeight: 600, marginTop: '4px', color: 'var(--text-primary, #fff)' }}>{myReferralData?.referralCode || 'N/A'}</div>
           </div>
         </div>
         <div className="table-container">

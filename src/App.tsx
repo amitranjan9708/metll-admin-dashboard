@@ -400,12 +400,17 @@ const UsersPage = () => {
   );
 };
 
-const AmbassadorsPage = () => {
+const AmbassadorsPage = ({ isAmbassadorOnly }: { isAmbassadorOnly?: boolean }) => {
   const [ambassadors, setAmbassadors] = useState<any[]>([]);
+  const [myReferralData, setMyReferralData] = useState<any>(null);
   const [loading, setLoading] = useState(true);
 
   const fetchAmbassadors = () => {
-    AdminService.getAmbassadors().then(res => setAmbassadors(res.data)).finally(() => setLoading(false));
+    if (isAmbassadorOnly) {
+      AdminService.getMyReferrals().then(res => setMyReferralData(res.data)).finally(() => setLoading(false));
+    } else {
+      AdminService.getAmbassadors().then(res => setAmbassadors(res.data)).finally(() => setLoading(false));
+    }
   };
 
   useEffect(() => {
@@ -418,6 +423,57 @@ const AmbassadorsPage = () => {
       fetchAmbassadors();
     }
   };
+
+  if (isAmbassadorOnly) {
+    return (
+      <div className="card">
+        <h2>My Referrals</h2>
+        <div style={{ display: 'flex', gap: '2rem', marginBottom: '1.5rem', marginTop: '1rem' }}>
+          <div style={{ background: 'var(--bg-sidebar)', padding: '1rem', borderRadius: '8px', minWidth: '150px' }}>
+            <div style={{ fontSize: '12px', color: 'var(--text-secondary)' }}>Total Referrals</div>
+            <div style={{ fontSize: '24px', fontWeight: 600, color: 'var(--accent)' }}>{myReferralData?.totalReferrals || 0}</div>
+          </div>
+          <div style={{ background: 'var(--bg-sidebar)', padding: '1rem', borderRadius: '8px', minWidth: '150px' }}>
+            <div style={{ fontSize: '12px', color: 'var(--text-secondary)' }}>My Referral Code</div>
+            <div style={{ fontSize: '18px', fontWeight: 600, marginTop: '4px' }}>{myReferralData?.referralCode || 'N/A'}</div>
+          </div>
+        </div>
+        <div className="table-container">
+          {loading ? <p>Loading your referrals...</p> : (
+            <table>
+              <thead>
+                <tr>
+                  <th>Name</th>
+                  <th>Email</th>
+                  <th>Date Joined</th>
+                  <th>Status</th>
+                </tr>
+              </thead>
+              <tbody>
+                {myReferralData?.referrals?.map((ref: any) => (
+                  <tr key={ref.id}>
+                    <td>{ref.name}</td>
+                    <td>{ref.email}</td>
+                    <td>{new Date(ref.date).toLocaleDateString()}</td>
+                    <td>
+                      <span className={`badge ${ref.status === 'Verified' ? 'badge-success' : 'badge-warning'}`}>
+                        {ref.status}
+                      </span>
+                    </td>
+                  </tr>
+                ))}
+                {(!myReferralData?.referrals || myReferralData.referrals.length === 0) && (
+                  <tr>
+                    <td colSpan={4} style={{ textAlign: 'center', padding: '2rem' }}>You haven't referred anyone yet.</td>
+                  </tr>
+                )}
+              </tbody>
+            </table>
+          )}
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="card">
@@ -1829,8 +1885,8 @@ function App() {
             <Routes>
               {isAmbassadorOnly ? (
                 <>
-                  <Route path="/" element={<AmbassadorsPage />} />
-                  <Route path="*" element={<AmbassadorsPage />} />
+                  <Route path="/" element={<AmbassadorsPage isAmbassadorOnly={true} />} />
+                  <Route path="*" element={<AmbassadorsPage isAmbassadorOnly={true} />} />
                 </>
               ) : (
                 <>

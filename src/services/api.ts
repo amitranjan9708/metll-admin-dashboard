@@ -37,6 +37,11 @@ export const AdminService = {
     return response.data;
   },
 
+  getMyReferrals: async () => {
+    const response = await api.get('/admin/ambassadors/my-referrals');
+    return response.data;
+  },
+
   toggleAmbassador: async (userId: number, isAmbassador: boolean) => {
     const response = await api.put(`/admin/users/${userId}/ambassador`, { isAmbassador });
     return response.data;

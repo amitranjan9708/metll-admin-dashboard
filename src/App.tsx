@@ -1347,6 +1347,8 @@ const PushNotificationsPage = () => {
     platforms: [] as string[],
     activeWithinDays: '',
     onboardedOnly: false,
+    nonOnboardedOnly: false,
+    excludeIds: '',
   });
 
   // Custom data key-value pairs
@@ -1394,6 +1396,13 @@ const PushNotificationsPage = () => {
           if (filters.platforms.length > 0) parsedFilters.platforms = filters.platforms;
           if (filters.activeWithinDays) parsedFilters.activeWithinDays = parseInt(filters.activeWithinDays);
           if (filters.onboardedOnly) parsedFilters.onboardedOnly = true;
+          if (filters.nonOnboardedOnly) parsedFilters.nonOnboardedOnly = true;
+          if (filters.excludeIds) {
+            parsedFilters.excludeUserIds = filters.excludeIds
+              .split(',')
+              .map(s => parseInt(s.trim()))
+              .filter(n => !isNaN(n));
+          }
         }
         const specificIds =
           form.targetType === 'specific'
@@ -1433,6 +1442,13 @@ const PushNotificationsPage = () => {
         if (filters.platforms.length > 0) parsedFilters.platforms = filters.platforms;
         if (filters.activeWithinDays) parsedFilters.activeWithinDays = parseInt(filters.activeWithinDays);
         if (filters.onboardedOnly) parsedFilters.onboardedOnly = true;
+        if (filters.nonOnboardedOnly) parsedFilters.nonOnboardedOnly = true;
+        if (filters.excludeIds) {
+          parsedFilters.excludeUserIds = filters.excludeIds
+            .split(',')
+            .map(s => parseInt(s.trim()))
+            .filter(n => !isNaN(n));
+        }
       }
 
       const specificIds =
@@ -1456,7 +1472,7 @@ const PushNotificationsPage = () => {
 
       // Reset form
       setForm({ title: '', body: '', imageUrl: '', deepLink: '', priority: 'high', targetType: 'all', specificIds: '' });
-      setFilters({ gender: [], ageMin: '', ageMax: '', city: '', verifiedOnly: false, platforms: [], activeWithinDays: '', onboardedOnly: false });
+      setFilters({ gender: [], ageMin: '', ageMax: '', city: '', verifiedOnly: false, platforms: [], activeWithinDays: '', onboardedOnly: false, nonOnboardedOnly: false, excludeIds: '' });
       setCustomData([]);
 
       // Refresh history
@@ -1668,17 +1684,38 @@ const PushNotificationsPage = () => {
                     onChange={e => setFilters(f => ({ ...f, activeWithinDays: e.target.value }))} />
                 </div>
 
-                <div style={{ display: 'flex', gap: '1.5rem' }}>
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
                   <label style={{ display: 'flex', alignItems: 'center', gap: '6px', fontSize: '13px', cursor: 'pointer' }}>
                     <input type="checkbox" checked={filters.verifiedOnly}
                       onChange={e => setFilters(f => ({ ...f, verifiedOnly: e.target.checked }))} />
                     Verified users only
                   </label>
-                  <label style={{ display: 'flex', alignItems: 'center', gap: '6px', fontSize: '13px', cursor: 'pointer' }}>
-                    <input type="checkbox" checked={filters.onboardedOnly}
-                      onChange={e => setFilters(f => ({ ...f, onboardedOnly: e.target.checked }))} />
-                    Onboarded only
-                  </label>
+                  <div style={{ display: 'flex', gap: '1.5rem', flexWrap: 'wrap' }}>
+                    <label style={{ display: 'flex', alignItems: 'center', gap: '6px', fontSize: '13px', cursor: 'pointer' }}>
+                      <input type="checkbox" checked={filters.onboardedOnly}
+                        onChange={e => setFilters(f => ({ 
+                          ...f, 
+                          onboardedOnly: e.target.checked,
+                          nonOnboardedOnly: e.target.checked ? false : f.nonOnboardedOnly 
+                        }))} />
+                      Onboarded only
+                    </label>
+                    <label style={{ display: 'flex', alignItems: 'center', gap: '6px', fontSize: '13px', cursor: 'pointer' }}>
+                      <input type="checkbox" checked={filters.nonOnboardedOnly}
+                        onChange={e => setFilters(f => ({ 
+                          ...f, 
+                          nonOnboardedOnly: e.target.checked,
+                          onboardedOnly: e.target.checked ? false : f.onboardedOnly 
+                        }))} />
+                      Signed up but not onboarded
+                    </label>
+                  </div>
+                </div>
+
+                <div>
+                  <label style={labelStyle}>Exclude User IDs (comma separated)</label>
+                  <input style={inputStyle} placeholder="e.g. 12, 45, 103" value={filters.excludeIds}
+                    onChange={e => setFilters(f => ({ ...f, excludeIds: e.target.value }))} />
                 </div>
               </div>
             )}

@@ -1947,6 +1947,7 @@ const AppConfigsPage = () => {
           <label style={{ display: 'block', marginBottom: '0.5rem', fontWeight: 500 }}>Promo Modal Cooldown (Hours)</label>
           <input 
             type="number" 
+            step="0.01"
             value={configs.promoModalCooldownHours || ''} 
             onChange={(e) => handleChange('promoModalCooldownHours', e.target.value)}
             style={{ width: '100%', padding: '0.75rem', borderRadius: '8px', border: '1px solid var(--border-color)' }}
@@ -1958,6 +1959,7 @@ const AppConfigsPage = () => {
           <label style={{ display: 'block', marginBottom: '0.5rem', fontWeight: 500 }}>Rating Modal Cooldown (Hours)</label>
           <input 
             type="number" 
+            step="0.01"
             value={configs.ratingModalCooldownHours || ''} 
             onChange={(e) => handleChange('ratingModalCooldownHours', e.target.value)}
             style={{ width: '100%', padding: '0.75rem', borderRadius: '8px', border: '1px solid var(--border-color)' }}

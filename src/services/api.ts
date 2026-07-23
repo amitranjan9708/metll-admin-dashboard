@@ -22,6 +22,16 @@ export const AdminService = {
     return response.data;
   },
 
+  getConfigs: async () => {
+    const response = await api.get('/config');
+    return response.data;
+  },
+
+  updateConfigs: async (configs: Record<string, string>) => {
+    const response = await api.put('/config', configs);
+    return response.data;
+  },
+
   getUsers: async (page = 1, limit = 50) => {
     const response = await api.get(`/admin/users?page=${page}&limit=${limit}`);
     return response.data;

@@ -28,6 +28,8 @@
   flex-direction: column;
   gap: 0.5rem;
   padding: 0 1rem;
+  flex: 1;
+  overflow-y: auto;
 }
 
 .nav-item {
@@ -39,6 +41,8 @@
   color: var(--text-sidebar);
   transition: all 0.2s;
   font-weight: 500;
+  cursor: pointer;
+  text-decoration: none;
 }
 
 .nav-item:hover {

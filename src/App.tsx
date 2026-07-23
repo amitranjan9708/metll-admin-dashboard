@@ -152,6 +152,7 @@ const Sidebar = ({ onLogout, isAmbassadorOnly }: { onLogout: () => void, isAmbas
     { path: '/jobs', icon: <Briefcase size={20} />, label: 'Careers (Jobs)' },
     { path: '/push-notifications', icon: <Bell size={20} />, label: 'Push Notifications' },
     { path: '/ambassadors', icon: <Users size={20} />, label: 'Ambassadors' },
+    { path: '/configs', icon: <Zap size={20} />, label: 'App Configs' },
   ];
 
   const menuItems = isAmbassadorOnly
@@ -177,7 +178,7 @@ const Sidebar = ({ onLogout, isAmbassadorOnly }: { onLogout: () => void, isAmbas
         ))}
       </nav>
       <div style={{ marginTop: 'auto', padding: '0 1rem' }}>
-        <button className="nav-item" onClick={onLogout} style={{ width: '100%', border: 'none', background: 'transparent' }}>
+        <button className="nav-item" onClick={onLogout} style={{ width: '100%', border: 'none', background: 'transparent', textAlign: 'left' }}>
           <LogOut size={20} />
           Logout
         </button>
@@ -202,8 +203,9 @@ const Topnav = ({ isAmbassadorOnly }: { isAmbassadorOnly: boolean }) => {
       case '/feedback': return 'User Feedback';
       case '/jobs': return 'Careers (Jobs)';
       case '/push-notifications': return 'Push Notifications';
-      case '/ambassadors': return 'Campus Ambassadors';
-      default: return 'Admin Dashboard';
+      case '/ambassadors': return 'Ambassadors';
+      case '/configs': return 'App Configurations';
+      default: return 'Dashboard';
     }
   };
 
@@ -1882,6 +1884,99 @@ const PushNotificationsPage = () => {
   );
 };
 
+const AppConfigsPage = () => {
+  const [configs, setConfigs] = useState<Record<string, string>>({});
+  const [loading, setLoading] = useState(true);
+  const [saving, setSaving] = useState(false);
+  const [error, setError] = useState('');
+  const [success, setSuccess] = useState('');
+
+  useEffect(() => {
+    fetchConfigs();
+  }, []);
+
+  const fetchConfigs = async () => {
+    try {
+      setLoading(true);
+      const res = await AdminService.getConfigs();
+      if (res.success && res.data) {
+        setConfigs(res.data);
+      }
+    } catch (err: any) {
+      setError(err.message || 'Failed to fetch configs');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleSave = async () => {
+    try {
+      setSaving(true);
+      setError('');
+      setSuccess('');
+      const res = await AdminService.updateConfigs(configs);
+      if (res.success) {
+        setSuccess('Configs updated successfully!');
+      } else {
+        setError(res.message || 'Failed to update configs');
+      }
+    } catch (err: any) {
+      setError(err.message || 'Failed to update configs');
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const handleChange = (key: string, value: string) => {
+    setConfigs(prev => ({ ...prev, [key]: value }));
+  };
+
+  if (loading) return <div>Loading configs...</div>;
+
+  return (
+    <div className="page-container">
+      <div className="page-header">
+        <h1 className="page-title">App Configurations</h1>
+      </div>
+      
+      {error && <div style={{ color: 'var(--danger)', marginBottom: '1rem' }}>{error}</div>}
+      {success && <div style={{ color: 'var(--primary)', marginBottom: '1rem' }}>{success}</div>}
+
+      <div className="card" style={{ maxWidth: '600px' }}>
+        <div style={{ marginBottom: '1.5rem' }}>
+          <label style={{ display: 'block', marginBottom: '0.5rem', fontWeight: 500 }}>Promo Modal Cooldown (Hours)</label>
+          <input 
+            type="number" 
+            value={configs.promoModalCooldownHours || ''} 
+            onChange={(e) => handleChange('promoModalCooldownHours', e.target.value)}
+            style={{ width: '100%', padding: '0.75rem', borderRadius: '8px', border: '1px solid var(--border-color)' }}
+          />
+          <small style={{ color: 'var(--text-secondary)' }}>How often should the daily promo modal be shown to users?</small>
+        </div>
+
+        <div style={{ marginBottom: '1.5rem' }}>
+          <label style={{ display: 'block', marginBottom: '0.5rem', fontWeight: 500 }}>Rating Modal Cooldown (Hours)</label>
+          <input 
+            type="number" 
+            value={configs.ratingModalCooldownHours || ''} 
+            onChange={(e) => handleChange('ratingModalCooldownHours', e.target.value)}
+            style={{ width: '100%', padding: '0.75rem', borderRadius: '8px', border: '1px solid var(--border-color)' }}
+          />
+          <small style={{ color: 'var(--text-secondary)' }}>How often should the app rating modal be shown to users until they rate?</small>
+        </div>
+
+        <button 
+          className="btn btn-primary" 
+          onClick={handleSave} 
+          disabled={saving}
+        >
+          {saving ? 'Saving...' : 'Save Configurations'}
+        </button>
+      </div>
+    </div>
+  );
+};
+
 function App() {
   const [isAuthenticated, setIsAuthenticated] = useState(!!localStorage.getItem('admin_token'));
   
@@ -1953,6 +2048,7 @@ function App() {
                   <Route path="/jobs" element={<JobsPage />} />
                   <Route path="/push-notifications" element={<PushNotificationsPage />} />
                   <Route path="/ambassadors" element={<AmbassadorsPage />} />
+                  <Route path="/configs" element={<AppConfigsPage />} />
                 </>
               )}
             </Routes>

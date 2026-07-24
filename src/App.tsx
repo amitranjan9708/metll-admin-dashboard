@@ -2370,7 +2370,7 @@ const WithdrawalsPage = () => {
       }
       map[uid].requests.push(w);
       if (w.status === 'pending') {
-        map[uid].totalPendingRupees += (w.rupeeAmount || 0);
+        map[uid].totalPendingRupees += (w.amountRupees || 0);
       }
     });
     let usersList = Object.values(map);
@@ -2481,8 +2481,8 @@ const WithdrawalsPage = () => {
                                 {group.requests.map((w: any) => (
                                   <tr key={w.id}>
                                     <td>{new Date(w.requestedAt).toLocaleString()}</td>
-                                    <td style={{ fontWeight: 'bold' }}>{w.coinsAmount}</td>
-                                    <td style={{ color: 'var(--success)', fontWeight: 'bold' }}>₹{w.rupeeAmount}</td>
+                                    <td style={{ fontWeight: 'bold' }}>{w.amountCoins}</td>
+                                    <td style={{ color: 'var(--success)', fontWeight: 'bold' }}>₹{w.amountRupees}</td>
                                     <td>{getStatusBadge(w.status)}</td>
                                     <td>
                                       {w.status === 'pending' && (

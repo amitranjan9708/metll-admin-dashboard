@@ -152,6 +152,7 @@ const Sidebar = ({ onLogout, isAmbassadorOnly }: { onLogout: () => void, isAmbas
     { path: '/jobs', icon: <Briefcase size={20} />, label: 'Careers (Jobs)' },
     { path: '/push-notifications', icon: <Bell size={20} />, label: 'Push Notifications' },
     { path: '/ambassadors', icon: <Users size={20} />, label: 'Ambassadors' },
+    { path: '/withdrawals', icon: <CreditCard size={20} />, label: 'Referral Payouts' },
     { path: '/configs', icon: <Zap size={20} />, label: 'App Configs' },
   ];
 
@@ -204,6 +205,7 @@ const Topnav = ({ isAmbassadorOnly }: { isAmbassadorOnly: boolean }) => {
       case '/jobs': return 'Careers (Jobs)';
       case '/push-notifications': return 'Push Notifications';
       case '/ambassadors': return 'Ambassadors';
+      case '/withdrawals': return 'Referral Payouts';
       case '/configs': return 'App Configurations';
       default: return 'Dashboard';
     }
@@ -274,14 +276,19 @@ const Overview = () => {
 const UsersPage = () => {
   const [users, setUsers] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
+  const [searchEmail, setSearchEmail] = useState('');
 
-  const fetchUsers = () => {
-    AdminService.getUsers().then(res => setUsers(res.users)).finally(() => setLoading(false));
-  };
+  const fetchUsers = useCallback(() => {
+    setLoading(true);
+    AdminService.getUsers(1, 50, searchEmail).then(res => setUsers(res.users)).finally(() => setLoading(false));
+  }, [searchEmail]);
 
   useEffect(() => {
-    fetchUsers();
-  }, []);
+    const delayDebounceFn = setTimeout(() => {
+      fetchUsers();
+    }, 400);
+    return () => clearTimeout(delayDebounceFn);
+  }, [fetchUsers]);
 
   const handleUpdate = async (userId: number, field: string, value: any) => {
     try {
@@ -296,10 +303,25 @@ const UsersPage = () => {
     }
   };
 
+  const filteredUsers = React.useMemo(() => {
+    if (!searchEmail.trim()) return users;
+    const lowerSearch = searchEmail.toLowerCase().trim();
+    return users.filter(user => user.email?.toLowerCase().includes(lowerSearch));
+  }, [users, searchEmail]);
+
   return (
     <div className="card">
-      <h2>Users Management</h2>
-      <div className="table-container" style={{ marginTop: '1.5rem', overflow: 'visible' }}>
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1.5rem' }}>
+        <h2>Users Management</h2>
+        <input 
+          type="text" 
+          placeholder="Search by Email..." 
+          value={searchEmail}
+          onChange={(e) => setSearchEmail(e.target.value)}
+          style={{ padding: '0.5rem 1rem', borderRadius: '8px', border: '1px solid var(--border-color)', minWidth: '250px' }}
+        />
+      </div>
+      <div className="table-container" style={{ overflow: 'visible' }}>
         {loading ? <p>Loading users...</p> : (
           <table>
             <thead>
@@ -318,7 +340,7 @@ const UsersPage = () => {
               </tr>
             </thead>
             <tbody>
-              {users.map(user => (
+              {filteredUsers.map(user => (
                 <tr key={user.id}>
                   <td><span style={{color: 'var(--text-secondary)', fontSize: '12px'}}>#{user.id}</span></td>
                   <td>
@@ -1979,6 +2001,300 @@ const AppConfigsPage = () => {
   );
 };
 
+// ── Withdrawals Page ────────────────────────────────────────────────────────
+
+const WithdrawalsPage = () => {
+  const [withdrawals, setWithdrawals] = useState<any[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [statusFilter, setStatusFilter] = useState<'all' | 'pending' | 'completed' | 'rejected'>('pending');
+  const [modalState, setModalState] = useState<{ id: number; action: 'completed' | 'rejected' } | null>(null);
+  const [transactionId, setTransactionId] = useState('');
+  const [note, setNote] = useState('');
+  const [processing, setProcessing] = useState(false);
+  const [expandedUserId, setExpandedUserId] = useState<number | null>(null);
+  const [searchEmail, setSearchEmail] = useState('');
+
+  const fetchWithdrawals = useCallback(async () => {
+    try {
+      setLoading(true);
+      const res = await AdminService.getWithdrawals(1, 100, statusFilter === 'all' ? undefined : statusFilter, searchEmail);
+      if (res.success) {
+        setWithdrawals(res.data.withdrawals);
+      }
+    } catch (err) {
+      console.error('Error fetching withdrawals', err);
+    } finally {
+      setLoading(false);
+    }
+  }, [statusFilter, searchEmail]);
+
+  useEffect(() => {
+    const delayDebounceFn = setTimeout(() => {
+      fetchWithdrawals();
+    }, 400);
+    return () => clearTimeout(delayDebounceFn);
+  }, [fetchWithdrawals]);
+
+  const handleProcess = async () => {
+    if (!modalState) return;
+    try {
+      setProcessing(true);
+      const res = await AdminService.processWithdrawal(modalState.id, modalState.action, transactionId, note);
+      if (res.success) {
+        alert(`Withdrawal marked as ${modalState.action}!`);
+        setModalState(null);
+        setTransactionId('');
+        setNote('');
+        fetchWithdrawals();
+      }
+    } catch (err: any) {
+      alert(err.response?.data?.message || 'Error processing withdrawal');
+    } finally {
+      setProcessing(false);
+    }
+  };
+
+  const getStatusBadge = (status: string) => {
+    const map: Record<string, { bg: string, color: string }> = {
+      pending: { bg: 'var(--warning-light)', color: '#D97706' },
+      completed: { bg: 'var(--success-light)', color: 'var(--success)' },
+      rejected: { bg: 'var(--danger-light)', color: 'var(--danger)' },
+    };
+    const style = map[status] || { bg: '#eee', color: '#666' };
+    return (
+      <span style={{ 
+        padding: '4px 8px', borderRadius: '12px', fontSize: '12px', fontWeight: 'bold', 
+        backgroundColor: style.bg, color: style.color 
+      }}>
+        {status.toUpperCase()}
+      </span>
+    );
+  };
+
+  const groupedUsers = React.useMemo(() => {
+    const map: Record<number, any> = {};
+    withdrawals.forEach(w => {
+      const uid = w.user?.id || 0;
+      if (!map[uid]) {
+        map[uid] = {
+          user: w.user,
+          upiId: w.upiId,
+          requests: [],
+          totalPendingRupees: 0
+        };
+      }
+      map[uid].requests.push(w);
+      if (w.status === 'pending') {
+        map[uid].totalPendingRupees += (w.rupeeAmount || 0);
+      }
+    });
+    let usersList = Object.values(map);
+    if (searchEmail.trim()) {
+      const lowerSearch = searchEmail.toLowerCase().trim();
+      usersList = usersList.filter(group => group.user?.email?.toLowerCase().includes(lowerSearch));
+    }
+    usersList.forEach(group => {
+      group.requests.sort((a: any, b: any) => new Date(b.requestedAt).getTime() - new Date(a.requestedAt).getTime());
+    });
+    return usersList;
+  }, [withdrawals, searchEmail]);
+
+  return (
+    <div>
+      <div className="header-actions">
+        <div>
+          <h2>Referral Payouts</h2>
+          <p style={{ color: 'var(--text-secondary)' }}>Manage and process coin withdrawals</p>
+        </div>
+        
+        <div style={{ display: 'flex', gap: '0.5rem', alignItems: 'center' }}>
+          <input 
+            type="text" 
+            placeholder="Search by Email..." 
+            value={searchEmail}
+            onChange={(e) => setSearchEmail(e.target.value)}
+            style={{ padding: '0.5rem 1rem', borderRadius: '8px', border: '1px solid var(--border-color)', minWidth: '200px' }}
+          />
+          {(['pending', 'completed', 'rejected', 'all'] as const).map(s => (
+            <button 
+              key={s} 
+              className={`btn ${statusFilter === s ? 'btn-primary' : ''}`}
+              style={statusFilter !== s ? { backgroundColor: 'var(--bg-card)', color: 'var(--text-primary)', border: '1px solid var(--border-color)' } : {}}
+              onClick={() => { setStatusFilter(s); setExpandedUserId(null); }}
+            >
+              {s.charAt(0).toUpperCase() + s.slice(1)}
+            </button>
+          ))}
+        </div>
+      </div>
+
+      <div className="card">
+        {loading ? (
+          <div style={{ textAlign: 'center', padding: '2rem' }}>Loading payouts...</div>
+        ) : groupedUsers.length === 0 ? (
+          <div style={{ textAlign: 'center', padding: '2rem', color: 'var(--text-secondary)' }}>No withdrawals found.</div>
+        ) : (
+          <div className="table-responsive">
+            <table className="table">
+              <thead>
+                <tr>
+                  <th>User Details</th>
+                  <th>UPI ID</th>
+                  <th>Pending Amount</th>
+                  <th>Total Requests</th>
+                  <th></th>
+                </tr>
+              </thead>
+              <tbody>
+                {groupedUsers.map(group => (
+                  <React.Fragment key={group.user?.id}>
+                    <tr 
+                      style={{ cursor: 'pointer', backgroundColor: expandedUserId === group.user?.id ? 'var(--bg-main)' : 'transparent' }} 
+                      onClick={() => setExpandedUserId(expandedUserId === group.user?.id ? null : group.user?.id)}
+                    >
+                      <td>
+                        <div style={{ fontWeight: 500 }}>{group.user?.name}</div>
+                        <div style={{ fontSize: '12px', color: 'var(--text-secondary)' }}>{group.user?.email}</div>
+                      </td>
+                      <td>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                          <code style={{ background: 'var(--bg-main)', padding: '2px 6px', borderRadius: '4px' }}>{group.upiId}</code>
+                          <button 
+                            title="Copy UPI ID"
+                            style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--primary)' }}
+                            onClick={(e) => { e.stopPropagation(); navigator.clipboard.writeText(group.upiId); alert('UPI Copied!'); }}
+                          >
+                            <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect x="9" y="9" width="13" height="13" rx="2" ry="2"></rect><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path></svg>
+                          </button>
+                        </div>
+                      </td>
+                      <td style={{ color: 'var(--success)', fontWeight: 'bold' }}>₹{group.totalPendingRupees}</td>
+                      <td>{group.requests.length} Requests</td>
+                      <td>
+                        <button className="btn" style={{ padding: '4px 8px', fontSize: '12px' }}>
+                          {expandedUserId === group.user?.id ? 'Collapse' : 'View Requests'}
+                        </button>
+                      </td>
+                    </tr>
+                    
+                    {expandedUserId === group.user?.id && (
+                      <tr>
+                        <td colSpan={5} style={{ padding: '0', backgroundColor: 'var(--bg-main)' }}>
+                          <div style={{ padding: '16px', margin: '8px 16px', backgroundColor: 'var(--bg-card)', borderRadius: '8px', border: '1px solid var(--border-color)' }}>
+                            <h4 style={{ marginBottom: '12px' }}>Withdrawal History</h4>
+                            <table className="table" style={{ margin: 0, fontSize: '14px' }}>
+                              <thead>
+                                <tr>
+                                  <th>Date</th>
+                                  <th>Coins</th>
+                                  <th>Rupees</th>
+                                  <th>Status</th>
+                                  <th>Actions</th>
+                                </tr>
+                              </thead>
+                              <tbody>
+                                {group.requests.map((w: any) => (
+                                  <tr key={w.id}>
+                                    <td>{new Date(w.requestedAt).toLocaleString()}</td>
+                                    <td style={{ fontWeight: 'bold' }}>{w.coinsAmount}</td>
+                                    <td style={{ color: 'var(--success)', fontWeight: 'bold' }}>₹{w.rupeeAmount}</td>
+                                    <td>{getStatusBadge(w.status)}</td>
+                                    <td>
+                                      {w.status === 'pending' && (
+                                        <div style={{ display: 'flex', gap: '8px' }}>
+                                          <button 
+                                            className="btn btn-primary" 
+                                            style={{ padding: '4px 8px', fontSize: '12px' }}
+                                            onClick={(e) => { e.stopPropagation(); setModalState({ id: w.id, action: 'completed' }); }}
+                                          >
+                                            Pay
+                                          </button>
+                                          <button 
+                                            className="btn btn-danger" 
+                                            style={{ padding: '4px 8px', fontSize: '12px' }}
+                                            onClick={(e) => { e.stopPropagation(); setModalState({ id: w.id, action: 'rejected' }); }}
+                                          >
+                                            Reject
+                                          </button>
+                                        </div>
+                                      )}
+                                      {w.status !== 'pending' && (
+                                        <div style={{ fontSize: '12px', color: 'var(--text-secondary)' }}>
+                                          {w.transactionId && <div>Txn: {w.transactionId}</div>}
+                                          {w.note && <div>Note: {w.note}</div>}
+                                        </div>
+                                      )}
+                                    </td>
+                                  </tr>
+                                ))}
+                              </tbody>
+                            </table>
+                          </div>
+                        </td>
+                      </tr>
+                    )}
+                  </React.Fragment>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        )}
+      </div>
+
+      {modalState && (
+        <div className="modal-overlay">
+          <div className="modal">
+            <h3 style={{ marginBottom: '1rem' }}>
+              {modalState.action === 'completed' ? 'Process Payment' : 'Reject Withdrawal'}
+            </h3>
+            
+            {modalState.action === 'completed' && (
+              <div style={{ marginBottom: '1rem' }}>
+                <label>Transaction ID / Reference (Optional)</label>
+                <input 
+                  type="text" 
+                  value={transactionId} 
+                  onChange={(e) => setTransactionId(e.target.value)}
+                  style={{ width: '100%', padding: '0.75rem', borderRadius: '8px', border: '1px solid var(--border-color)', marginTop: '0.5rem' }}
+                  placeholder="e.g. UTR123456789"
+                />
+              </div>
+            )}
+            
+            <div style={{ marginBottom: '1rem' }}>
+              <label>Note / Reason (Optional)</label>
+              <textarea 
+                value={note} 
+                onChange={(e) => setNote(e.target.value)}
+                style={{ width: '100%', padding: '0.75rem', borderRadius: '8px', border: '1px solid var(--border-color)', marginTop: '0.5rem', minHeight: '80px' }}
+                placeholder={modalState.action === 'rejected' ? 'Reason for rejection...' : 'Any notes...'}
+              />
+            </div>
+
+            <div style={{ display: 'flex', gap: '1rem', marginTop: '1.5rem' }}>
+              <button 
+                className="btn" 
+                style={{ flex: 1, backgroundColor: 'var(--bg-sidebar)' }} 
+                onClick={() => setModalState(null)}
+              >
+                Cancel
+              </button>
+              <button 
+                className={`btn ${modalState.action === 'completed' ? 'btn-primary' : 'btn-danger'}`} 
+                style={{ flex: 1, justifyContent: 'center' }} 
+                onClick={handleProcess}
+                disabled={processing}
+              >
+                {processing ? 'Processing...' : (modalState.action === 'completed' ? 'Mark as Paid' : 'Reject Request')}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+};
+
 function App() {
   const [isAuthenticated, setIsAuthenticated] = useState(!!localStorage.getItem('admin_token'));
   
@@ -2050,6 +2366,7 @@ function App() {
                   <Route path="/jobs" element={<JobsPage />} />
                   <Route path="/push-notifications" element={<PushNotificationsPage />} />
                   <Route path="/ambassadors" element={<AmbassadorsPage />} />
+                  <Route path="/withdrawals" element={<WithdrawalsPage />} />
                   <Route path="/configs" element={<AppConfigsPage />} />
                 </>
               )}

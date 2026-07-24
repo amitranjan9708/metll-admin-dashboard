@@ -32,8 +32,10 @@ export const AdminService = {
     return response.data;
   },
 
-  getUsers: async (page = 1, limit = 50) => {
-    const response = await api.get(`/admin/users?page=${page}&limit=${limit}`);
+  getUsers: async (page = 1, limit = 50, search = '') => {
+    let url = `/admin/users?page=${page}&limit=${limit}`;
+    if (search) url += `&search=${encodeURIComponent(search)}`;
+    const response = await api.get(url);
     return response.data;
   },
 
@@ -152,6 +154,25 @@ export const AdminService = {
     filters?: Record<string, any>;
   }) => {
     const response = await api.post('/admin/notifications/broadcast', payload);
+    return response.data;
+  },
+
+  // ── Referral Payouts ──────────────────────────────────────────────────────
+
+  getWithdrawals: async (page = 1, limit = 50, status?: string, search?: string) => {
+    let url = `/admin/withdrawals?page=${page}&limit=${limit}`;
+    if (status) url += `&status=${status}`;
+    if (search) url += `&search=${encodeURIComponent(search)}`;
+    const response = await api.get(url);
+    return response.data;
+  },
+
+  processWithdrawal: async (id: number, status: 'completed' | 'rejected', transactionId?: string, note?: string) => {
+    const response = await api.put(`/admin/withdrawals/${id}`, {
+      status,
+      transactionId,
+      note,
+    });
     return response.data;
   },
 };

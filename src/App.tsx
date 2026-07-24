@@ -1912,6 +1912,8 @@ const AppConfigsPage = () => {
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState('');
   const [success, setSuccess] = useState('');
+  const [newKey, setNewKey] = useState('');
+  const [newValue, setNewValue] = useState('');
 
   useEffect(() => {
     fetchConfigs();
@@ -1939,6 +1941,7 @@ const AppConfigsPage = () => {
       const res = await AdminService.updateConfigs(configs);
       if (res.success) {
         setSuccess('Configs updated successfully!');
+        fetchConfigs();
       } else {
         setError(res.message || 'Failed to update configs');
       }
@@ -1953,7 +1956,22 @@ const AppConfigsPage = () => {
     setConfigs(prev => ({ ...prev, [key]: value }));
   };
 
-  if (loading) return <div>Loading configs...</div>;
+  const handleRemove = (key: string) => {
+    setConfigs(prev => {
+      const next = { ...prev };
+      delete next[key];
+      return next;
+    });
+  };
+
+  const handleAdd = () => {
+    if (!newKey.trim()) return;
+    setConfigs(prev => ({ ...prev, [newKey.trim()]: newValue }));
+    setNewKey('');
+    setNewValue('');
+  };
+
+  if (loading) return <div style={{ padding: '2rem', textAlign: 'center' }}>Loading configs...</div>;
 
   return (
     <div className="page-container">
@@ -1961,40 +1979,85 @@ const AppConfigsPage = () => {
         <h1 className="page-title">App Configurations</h1>
       </div>
       
-      {error && <div style={{ color: 'var(--danger)', marginBottom: '1rem' }}>{error}</div>}
-      {success && <div style={{ color: 'var(--primary)', marginBottom: '1rem' }}>{success}</div>}
+      {error && <div style={{ color: 'var(--danger)', marginBottom: '1rem', padding: '1rem', backgroundColor: 'var(--danger-light)', borderRadius: '8px' }}>{error}</div>}
+      {success && <div style={{ color: 'var(--success)', marginBottom: '1rem', padding: '1rem', backgroundColor: 'var(--success-light)', borderRadius: '8px' }}>{success}</div>}
 
-      <div className="card" style={{ maxWidth: '600px' }}>
-        <div style={{ marginBottom: '1.5rem' }}>
-          <label style={{ display: 'block', marginBottom: '0.5rem', fontWeight: 500 }}>Promo Modal Cooldown (Hours)</label>
-          <input 
-            type="number" 
-            step="0.01"
-            value={configs.promoModalCooldownHours || ''} 
-            onChange={(e) => handleChange('promoModalCooldownHours', e.target.value)}
-            style={{ width: '100%', padding: '0.75rem', borderRadius: '8px', border: '1px solid var(--border-color)' }}
-          />
-          <small style={{ color: 'var(--text-secondary)' }}>How often should the daily promo modal be shown to users?</small>
+      <div className="card" style={{ maxWidth: '800px' }}>
+        <p style={{ color: 'var(--text-secondary)', marginBottom: '2rem' }}>
+          Manage global application configuration dynamically. Values must be strings. For booleans, use "true" or "false".
+        </p>
+
+        <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem', marginBottom: '2rem' }}>
+          {Object.entries(configs).map(([key, value]) => (
+            <div key={key} style={{ display: 'flex', gap: '1rem', alignItems: 'flex-start' }}>
+              <div style={{ flex: 1 }}>
+                <input 
+                  type="text" 
+                  value={key} 
+                  disabled
+                  style={{ width: '100%', padding: '0.75rem', borderRadius: '8px', border: '1px solid var(--border-color)', backgroundColor: 'var(--bg-main)', color: 'var(--text-secondary)' }}
+                />
+              </div>
+              <div style={{ flex: 2 }}>
+                <input 
+                  type="text" 
+                  value={value} 
+                  onChange={(e) => handleChange(key, e.target.value)}
+                  placeholder="Value..."
+                  style={{ width: '100%', padding: '0.75rem', borderRadius: '8px', border: '1px solid var(--primary)' }}
+                />
+              </div>
+              <button 
+                className="btn btn-danger" 
+                onClick={() => handleRemove(key)}
+                style={{ padding: '0.75rem', height: '100%' }}
+                title="Remove Config"
+              >
+                <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><polyline points="3 6 5 6 21 6"></polyline><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path><line x1="10" y1="11" x2="10" y2="17"></line><line x1="14" y1="11" x2="14" y2="17"></line></svg>
+              </button>
+            </div>
+          ))}
+          
+          {Object.keys(configs).length === 0 && (
+            <div style={{ textAlign: 'center', color: 'var(--text-secondary)', padding: '2rem' }}>No configurations found.</div>
+          )}
         </div>
 
-        <div style={{ marginBottom: '1.5rem' }}>
-          <label style={{ display: 'block', marginBottom: '0.5rem', fontWeight: 500 }}>Rating Modal Cooldown (Hours)</label>
-          <input 
-            type="number" 
-            step="0.01"
-            value={configs.ratingModalCooldownHours || ''} 
-            onChange={(e) => handleChange('ratingModalCooldownHours', e.target.value)}
-            style={{ width: '100%', padding: '0.75rem', borderRadius: '8px', border: '1px solid var(--border-color)' }}
-          />
-          <small style={{ color: 'var(--text-secondary)' }}>How often should the app rating modal be shown to users until they rate?</small>
+        <div style={{ borderTop: '1px solid var(--border-color)', paddingTop: '1.5rem', marginBottom: '2rem' }}>
+          <h4 style={{ marginBottom: '1rem' }}>Add New Config</h4>
+          <div style={{ display: 'flex', gap: '1rem', alignItems: 'center' }}>
+            <input 
+              type="text" 
+              placeholder="Key (e.g., showEarlyAmbassadorCta)"
+              value={newKey}
+              onChange={(e) => setNewKey(e.target.value)}
+              style={{ flex: 1, padding: '0.75rem', borderRadius: '8px', border: '1px solid var(--border-color)' }}
+            />
+            <input 
+              type="text" 
+              placeholder="Value (e.g., true)"
+              value={newValue}
+              onChange={(e) => setNewValue(e.target.value)}
+              style={{ flex: 2, padding: '0.75rem', borderRadius: '8px', border: '1px solid var(--border-color)' }}
+            />
+            <button 
+              className="btn btn-primary" 
+              onClick={handleAdd}
+              disabled={!newKey.trim()}
+              style={{ padding: '0.75rem 1.5rem' }}
+            >
+              Add
+            </button>
+          </div>
         </div>
 
         <button 
           className="btn btn-primary" 
           onClick={handleSave} 
           disabled={saving}
+          style={{ width: '100%', justifyContent: 'center', padding: '1rem' }}
         >
-          {saving ? 'Saving...' : 'Save Configurations'}
+          {saving ? 'Saving...' : 'Save All Configurations'}
         </button>
       </div>
     </div>

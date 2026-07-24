@@ -19,7 +19,8 @@ import {
   CheckCircle,
   XCircle,
   Clock,
-  Zap
+  Zap,
+  ShieldAlert
 } from 'lucide-react';
 import { api, AdminService } from './services/api';
 import './App.css';
@@ -146,6 +147,7 @@ const Sidebar = ({ onLogout, isAmbassadorOnly }: { onLogout: () => void, isAmbas
     { path: '/chats', icon: <MessageSquare size={20} />, label: 'Chats' },
     { path: '/subscriptions', icon: <CreditCard size={20} />, label: 'Subscriptions' },
     { path: '/bulk-email', icon: <Mail size={20} />, label: 'Bulk Email' },
+    { path: '/moderation', icon: <ShieldAlert size={20} />, label: 'Moderation' },
     { path: '/tickets', icon: <Ticket size={20} />, label: 'Support Tickets' },
     { path: '/create-profile', icon: <UserPlus size={20} />, label: 'Create Profile' },
     { path: '/feedback', icon: <MessageCircle size={20} />, label: 'User Feedback' },
@@ -199,6 +201,7 @@ const Topnav = ({ isAmbassadorOnly }: { isAmbassadorOnly: boolean }) => {
       case '/chats': return 'Chat Monitoring';
       case '/subscriptions': return 'Subscriptions & Payments';
       case '/bulk-email': return 'Bulk Email';
+      case '/moderation': return 'Content Moderation';
       case '/tickets': return 'Support Tickets';
       case '/create-profile': return 'Create AI Profile';
       case '/feedback': return 'User Feedback';
@@ -259,6 +262,12 @@ const Overview = () => {
         <div className="card stat-card">
           <span className="stat-title">Open Tickets</span>
           <span className="stat-value">{loading ? '...' : stats?.openTickets || 0}</span>
+        </div>
+        <div className="card stat-card">
+          <span className="stat-title">Pending Moderation</span>
+          <span className="stat-value" style={{ color: (stats?.pendingModeration || 0) > 0 ? '#d97706' : undefined }}>
+            {loading ? '...' : stats?.pendingModeration || 0}
+          </span>
         </div>
       </div>
       
@@ -601,6 +610,219 @@ const MatchingPage = () => {
 
 const ChatsPage = () => <div className="card"><h2>Chat Monitoring</h2><p>Chat logs and reports will appear here...</p></div>;
 const SubscriptionsPage = () => <div className="card"><h2>Subscriptions & Payments</h2><p>Revenue and payment tracking will appear here...</p></div>;
+
+const VERDICT_COLORS: Record<string, string> = {
+  csam: '#b91c1c',
+  blocked: '#dc2626',
+  flagged: '#d97706',
+  clean: '#16a34a',
+};
+
+const ModerationPage = () => {
+  const [flags, setFlags] = useState<any[]>([]);
+  const [stats, setStats] = useState<any>(null);
+  const [loading, setLoading] = useState(true);
+  const [statusFilter, setStatusFilter] = useState('pending');
+  const [typeFilter, setTypeFilter] = useState('');
+  const [autoRefresh, setAutoRefresh] = useState(true);
+
+  const fetchData = useCallback(() => {
+    Promise.all([
+      AdminService.getModerationFlags({ status: statusFilter || undefined, contentType: typeFilter || undefined }),
+      AdminService.getModerationStats(),
+    ])
+      .then(([flagsRes, statsRes]) => {
+        setFlags(flagsRes.flags || []);
+        setStats(statsRes);
+      })
+      .catch((err) => console.error('Moderation fetch failed', err))
+      .finally(() => setLoading(false));
+  }, [statusFilter, typeFilter]);
+
+  useEffect(() => {
+    setLoading(true);
+    fetchData();
+  }, [fetchData]);
+
+  // Continuous monitoring: poll every 20s while auto-refresh is on
+  useEffect(() => {
+    if (!autoRefresh) return;
+    const id = setInterval(fetchData, 20000);
+    return () => clearInterval(id);
+  }, [autoRefresh, fetchData]);
+
+  const handleAction = async (flagId: number, action: 'approve' | 'remove' | 'ban' | 'reported') => {
+    const labels: Record<string, string> = {
+      approve: 'approve (keep content)',
+      remove: 'remove this content',
+      ban: 'remove content AND ban the author',
+      reported: 'mark as reported',
+    };
+    if (!window.confirm(`Are you sure you want to ${labels[action]}?`)) return;
+    try {
+      await AdminService.reviewModerationFlag(flagId, action);
+      setFlags((prev) => prev.filter((f) => f.id !== flagId));
+      AdminService.getModerationStats().then(setStats).catch(() => {});
+    } catch (e) {
+      console.error('Review action failed', e);
+      alert('Action failed. Please try again.');
+    }
+  };
+
+  const CONTENT_TYPES = ['', 'photo', 'story', 'message', 'confession', 'bio', 'support', 'feedback'];
+
+  return (
+    <div>
+      {/* Stat cards */}
+      <div className="dashboard-grid">
+        <div className="card stat-card">
+          <span className="stat-title">Pending Review</span>
+          <span className="stat-value">{stats ? stats.pending : '...'}</span>
+        </div>
+        <div className="card stat-card" style={{ borderLeft: '3px solid #b91c1c' }}>
+          <span className="stat-title">⚠ CSAM Escalations</span>
+          <span className="stat-value" style={{ color: '#b91c1c' }}>{stats ? stats.csam : '...'}</span>
+        </div>
+        <div className="card stat-card">
+          <span className="stat-title">Contact-Info Shares</span>
+          <span className="stat-value">{stats ? stats.contactInfo : '...'}</span>
+        </div>
+        <div className="card stat-card">
+          <span className="stat-title">Auto-Refresh</span>
+          <button
+            className="nav-item"
+            onClick={() => setAutoRefresh((v) => !v)}
+            style={{ border: '1px solid var(--border-color)', background: 'transparent', marginTop: '0.5rem' }}
+          >
+            <Clock size={16} /> {autoRefresh ? 'On (20s)' : 'Off'}
+          </button>
+        </div>
+      </div>
+
+      <div className="card">
+        {/* Filters */}
+        <div style={{ display: 'flex', gap: '1rem', alignItems: 'center', flexWrap: 'wrap', marginBottom: '1rem' }}>
+          <div style={{ display: 'flex', gap: '0.5rem', alignItems: 'center' }}>
+            <Filter size={16} color="var(--text-secondary)" />
+            <select
+              value={statusFilter}
+              onChange={(e) => setStatusFilter(e.target.value)}
+              style={{ padding: '0.4rem', borderRadius: '6px', background: 'var(--bg-card)', color: 'var(--text-primary)', border: '1px solid var(--border-color)' }}
+            >
+              <option value="pending">Pending</option>
+              <option value="approved">Approved</option>
+              <option value="removed">Removed</option>
+              <option value="banned">Banned</option>
+              <option value="reported">Reported (CSAM)</option>
+              <option value="">All statuses</option>
+            </select>
+          </div>
+          <select
+            value={typeFilter}
+            onChange={(e) => setTypeFilter(e.target.value)}
+            style={{ padding: '0.4rem', borderRadius: '6px', background: 'var(--bg-card)', color: 'var(--text-primary)', border: '1px solid var(--border-color)' }}
+          >
+            {CONTENT_TYPES.map((t) => (
+              <option key={t} value={t}>{t === '' ? 'All types' : t}</option>
+            ))}
+          </select>
+        </div>
+
+        <div className="table-container">
+          {loading ? (
+            <p>Loading moderation queue...</p>
+          ) : flags.length === 0 ? (
+            <p style={{ color: 'var(--text-secondary)', padding: '1rem 0' }}>✅ Nothing to review in this view.</p>
+          ) : (
+            <table>
+              <thead>
+                <tr>
+                  <th>Type</th>
+                  <th>Verdict</th>
+                  <th>Category</th>
+                  <th>Content</th>
+                  <th>Author</th>
+                  <th>When</th>
+                  <th>Actions</th>
+                </tr>
+              </thead>
+              <tbody>
+                {flags.map((f) => (
+                  <tr key={f.id}>
+                    <td><span style={{ fontSize: 12, textTransform: 'capitalize' }}>{f.contentType}</span></td>
+                    <td>
+                      <span
+                        className="badge"
+                        style={{ background: VERDICT_COLORS[f.verdict] || '#6b7280', color: '#fff', textTransform: 'uppercase', fontSize: 11 }}
+                      >
+                        {f.verdict}
+                      </span>
+                    </td>
+                    <td>
+                      <div style={{ fontSize: 13 }}>{f.topCategory || '—'}</div>
+                      {f.topScore != null && (
+                        <div style={{ fontSize: 11, color: 'var(--text-secondary)' }}>
+                          {Math.round(f.topScore * 100)}%
+                        </div>
+                      )}
+                    </td>
+                    <td style={{ maxWidth: 240 }}>
+                      {f.mediaUrl ? (
+                        <a href={f.mediaUrl} target="_blank" rel="noreferrer">
+                          <img src={f.mediaUrl} alt="flagged" style={{ width: 56, height: 56, objectFit: 'cover', borderRadius: 6, border: '1px solid var(--border-color)' }} />
+                        </a>
+                      ) : (
+                        <div style={{ fontSize: 12, color: 'var(--text-secondary)', maxHeight: 60, overflow: 'auto' }}>
+                          {f.text || '—'}
+                        </div>
+                      )}
+                    </td>
+                    <td>
+                      {f.author ? (
+                        <div>
+                          <div style={{ fontSize: 13 }}>{f.author.name || 'N/A'}</div>
+                          <div style={{ fontSize: 11, color: 'var(--text-secondary)' }}>#{f.userId}</div>
+                        </div>
+                      ) : (
+                        <span style={{ fontSize: 12, color: 'var(--text-secondary)' }}>Anonymous</span>
+                      )}
+                    </td>
+                    <td><span style={{ fontSize: 12, color: 'var(--text-secondary)' }}>{new Date(f.createdAt).toLocaleString()}</span></td>
+                    <td>
+                      <div style={{ display: 'flex', gap: '0.35rem' }}>
+                        <button
+                          onClick={() => handleAction(f.id, 'approve')}
+                          title="Keep content"
+                          style={{ padding: '0.3rem 0.5rem', borderRadius: 6, border: 'none', background: '#16a34a', color: '#fff', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 4 }}
+                        >
+                          <CheckCircle size={14} />
+                        </button>
+                        <button
+                          onClick={() => handleAction(f.id, 'remove')}
+                          title="Remove content"
+                          style={{ padding: '0.3rem 0.5rem', borderRadius: 6, border: 'none', background: '#d97706', color: '#fff', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 4 }}
+                        >
+                          <XCircle size={14} />
+                        </button>
+                        <button
+                          onClick={() => handleAction(f.id, 'ban')}
+                          title="Remove + ban author"
+                          style={{ padding: '0.3rem 0.5rem', borderRadius: 6, border: 'none', background: '#b91c1c', color: '#fff', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 4 }}
+                        >
+                          <ShieldAlert size={14} />
+                        </button>
+                      </div>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          )}
+        </div>
+      </div>
+    </div>
+  );
+};
 
 const TicketsPage = () => {
   const [tickets, setTickets] = useState<any[]>([]);
@@ -2423,6 +2645,7 @@ function App() {
                   <Route path="/chats" element={<ChatsPage />} />
                   <Route path="/subscriptions" element={<SubscriptionsPage />} />
                   <Route path="/bulk-email" element={<BulkEmailPage />} />
+                  <Route path="/moderation" element={<ModerationPage />} />
                   <Route path="/tickets" element={<TicketsPage />} />
                   <Route path="/create-profile" element={<CreateProfilePage />} />
                   <Route path="/feedback" element={<FeedbackPage />} />

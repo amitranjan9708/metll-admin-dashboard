@@ -74,6 +74,25 @@ export const AdminService = {
     return response.data;
   },
 
+  // --- Content Moderation ---
+  getModerationFlags: async (params: { status?: string; verdict?: string; contentType?: string; page?: number } = {}) => {
+    const query = new URLSearchParams(
+      Object.entries(params).filter(([, v]) => v !== undefined && v !== '').map(([k, v]) => [k, String(v)])
+    ).toString();
+    const response = await api.get(`/admin/moderation${query ? `?${query}` : ''}`);
+    return response.data;
+  },
+
+  getModerationStats: async () => {
+    const response = await api.get('/admin/moderation/stats');
+    return response.data;
+  },
+
+  reviewModerationFlag: async (flagId: number, action: 'approve' | 'remove' | 'ban' | 'reported', note?: string) => {
+    const response = await api.put(`/admin/moderation/${flagId}`, { action, note });
+    return response.data;
+  },
+
   bulkSendEmail: async (formData: FormData) => {
     const response = await api.post('/admin/bulk-email', formData, {
       headers: {

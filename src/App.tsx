@@ -1,10 +1,10 @@
 import React, { useEffect, useState, useRef, useCallback } from 'react';
 import { BrowserRouter as Router, Routes, Route, NavLink, useLocation } from 'react-router-dom';
-import { 
-  LayoutDashboard, 
-  Users, 
-  MessageSquare, 
-  Heart, 
+import {
+  LayoutDashboard,
+  Users,
+  MessageSquare,
+  Heart,
   CreditCard,
   Ticket,
   LogOut,
@@ -20,7 +20,15 @@ import {
   XCircle,
   Clock,
   Zap,
-  ShieldAlert
+  ShieldAlert,
+  Tag,
+  RefreshCw,
+  Search,
+  Shield,
+  AlertCircle,
+  ChevronLeft,
+  ChevronRight,
+  Edit3
 } from 'lucide-react';
 import { api, AdminService } from './services/api';
 import './App.css';
@@ -179,7 +187,13 @@ const Sidebar = ({ onLogout, isAmbassadorOnly }: { onLogout: () => void, isAmbas
             {item.label}
           </NavLink>
         ))}
-      </nav>
+                {!isAmbassadorOnly && (
+            <NavLink to="/onesignal-tags" className={({ isActive }) => `nav-item ${isActive ? "active" : ""}`}>
+              <Tag size={20} />
+              <span>OneSignal Tags</span>
+            </NavLink>
+          )}
+        </nav>
       <div style={{ marginTop: 'auto', padding: '0 1rem' }}>
         <button className="nav-item" onClick={onLogout} style={{ width: '100%', border: 'none', background: 'transparent', textAlign: 'left' }}>
           <LogOut size={20} />
@@ -2580,6 +2594,546 @@ const WithdrawalsPage = () => {
   );
 };
 
+
+// ΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉ
+// OneSignal Tag Manager Page
+// ΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉ
+const OneSignalTagsPage = () => {
+  const [users, setUsers] = useState<any[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [search, setSearch] = useState('');
+  const [page, setPage] = useState(1);
+  const [pagination, setPagination] = useState<any>(null);
+  const [syncingAll, setSyncingAll] = useState(false);
+  const [syncingId, setSyncingId] = useState<number | null>(null);
+  const [toast, setToast] = useState<{ type: 'success' | 'error'; msg: string } | null>(null);
+
+  // Tag editor modal
+  const [editUser, setEditUser] = useState<any | null>(null);
+  const [editTags, setEditTags] = useState<{ key: string; value: string }[]>([]);
+  const [tagSaving, setTagSaving] = useState(false);
+
+  // Player ID editor modal
+  const [playerIdUser, setPlayerIdUser] = useState<any | null>(null);
+  const [playerIdInput, setPlayerIdInput] = useState('');
+  const [playerIdSaving, setPlayerIdSaving] = useState(false);
+
+  // CSV import
+  const [csvImporting, setCsvImporting] = useState(false);
+  const [csvResult, setCsvResult] = useState<any | null>(null);
+  const [csvSyncTags, setCsvSyncTags] = useState(false);
+  const csvInputRef = React.useRef<HTMLInputElement>(null);
+
+  const showToast = (type: 'success' | 'error', msg: string) => {
+    setToast({ type, msg });
+    setTimeout(() => setToast(null), 4000);
+  };
+
+  const fetchUsers = async (p = page, s = search) => {
+    setLoading(true);
+    try {
+      const res = await AdminService.getOneSignalUsers(p, 50, s);
+      setUsers(res.users || []);
+      setPagination(res.pagination);
+    } catch {
+      showToast('error', 'Failed to load users');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  useEffect(() => { fetchUsers(1, search); }, []);
+
+  const handleSearch = () => { setPage(1); fetchUsers(1, search); };
+
+  const handleSyncAll = async () => {
+    setSyncingAll(true);
+    try {
+      const res = await AdminService.syncAllTags();
+      showToast('success', res.message || 'Bulk sync complete');
+      fetchUsers(page, search);
+    } catch (e: any) {
+      showToast('error', e?.response?.data?.message || 'Bulk sync failed');
+    } finally {
+      setSyncingAll(false);
+    }
+  };
+
+  const handleSyncOne = async (userId: number) => {
+    setSyncingId(userId);
+    try {
+      const res = await AdminService.syncUserTags(userId);
+      showToast('success', res.message || `User ${userId} synced`);
+    } catch (e: any) {
+      showToast('error', e?.response?.data?.message || 'Sync failed');
+    } finally {
+      setSyncingId(null);
+    }
+  };
+
+  // Parse OneSignal export CSV and bulk-import player IDs
+  const handleCsvImport = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    const reader = new FileReader();
+    reader.onload = async (ev) => {
+      const text = ev.target?.result as string;
+      const lines = text.split('\n').filter(l => l.trim());
+      if (lines.length < 2) { showToast('error', 'CSV has no data rows'); return; }
+
+      // Parse header
+      const headers = lines[0].split(',').map(h => h.trim().replace(/^"|"$/g, ''));
+      const colExternalId = headers.indexOf('external_id');
+      const colPlayerId   = headers.indexOf('player_id');
+      const colSubscribed = headers.indexOf('subscribed');
+
+      if (colExternalId === -1 || colPlayerId === -1) {
+        showToast('error', 'CSV must have external_id and player_id columns');
+        return;
+      }
+
+      const entries = lines.slice(1).map(line => {
+        // Handle quoted fields
+        const cols = line.match(/(?:"[^"]*"|[^,]*)(?:,|$)/g)
+          ?.map(c => c.replace(/,$/, '').replace(/^"|"$/g, '').trim()) ?? line.split(',');
+        return {
+          externalId: cols[colExternalId] ?? '',
+          playerId: cols[colPlayerId] ?? '',
+          subscribed: colSubscribed !== -1 ? (cols[colSubscribed] ?? '').toLowerCase() === 'yes' : true,
+        };
+      }).filter(e => e.externalId && e.playerId);
+
+      if (entries.length === 0) { showToast('error', 'No valid rows found in CSV'); return; }
+
+      setCsvImporting(true);
+      setCsvResult(null);
+      try {
+        const res = await AdminService.importPlayerIds(entries, csvSyncTags);
+        setCsvResult(res);
+        showToast('success', res.message);
+        fetchUsers(page, search);
+      } catch (err: any) {
+        showToast('error', err?.response?.data?.message || 'Import failed');
+      } finally {
+        setCsvImporting(false);
+        if (csvInputRef.current) csvInputRef.current.value = '';
+      }
+    };
+    reader.readAsText(file);
+  };
+
+  // Tag editor
+  const openTagEditor = (user: any) => {
+    setEditUser(user);
+    setEditTags([{ key: '', value: '' }]);
+  };
+  const addTagRow = () => setEditTags(t => [...t, { key: '', value: '' }]);
+  const removeTagRow = (i: number) => setEditTags(t => t.filter((_, idx) => idx !== i));
+  const updateTagRow = (i: number, field: 'key' | 'value', val: string) =>
+    setEditTags(t => t.map((r, idx) => idx === i ? { ...r, [field]: val } : r));
+
+  const saveEditTags = async () => {
+    if (!editUser) return;
+    const tags: Record<string, string> = {};
+    editTags.forEach(r => { if (r.key.trim()) tags[r.key.trim()] = r.value; });
+    if (Object.keys(tags).length === 0) { showToast('error', 'Add at least one tag'); return; }
+    setTagSaving(true);
+    try {
+      const res = await AdminService.updateUserTags(editUser.id, tags);
+      showToast('success', res.message || 'Tags updated');
+      setEditUser(null);
+    } catch (e: any) {
+      showToast('error', e?.response?.data?.message || 'Failed to update tags');
+    } finally {
+      setTagSaving(false);
+    }
+  };
+
+  // Player ID editor
+  const openPlayerIdEditor = (user: any) => {
+    setPlayerIdUser(user);
+    setPlayerIdInput(user.oneSignalPlayerId || '');
+  };
+  const savePlayerId = async () => {
+    if (!playerIdUser || !playerIdInput.trim()) return;
+    setPlayerIdSaving(true);
+    try {
+      const res = await AdminService.setPlayerIdAdmin(playerIdUser.id, playerIdInput.trim());
+      showToast('success', res.message || 'Player ID saved & tags synced');
+      setPlayerIdUser(null);
+      fetchUsers(page, search);
+    } catch (e: any) {
+      showToast('error', e?.response?.data?.message || 'Failed to set player ID');
+    } finally {
+      setPlayerIdSaving(false);
+    }
+  };
+
+  const withPlayerIdCount = users.filter(u => u.oneSignalPlayerId).length;
+  const withoutPlayerIdCount = users.filter(u => !u.oneSignalPlayerId).length;
+
+  return (
+    <div>
+      {/* Toast */}
+      {toast && (
+        <div style={{
+          position: 'fixed', top: 20, right: 20, zIndex: 9999,
+          padding: '0.85rem 1.4rem', borderRadius: 10,
+          background: toast.type === 'success' ? 'var(--success, #22c55e)' : 'var(--danger, #ef4444)',
+          color: '#fff', fontWeight: 600, fontSize: 14,
+          boxShadow: '0 4px 20px rgba(0,0,0,0.25)',
+          display: 'flex', alignItems: 'center', gap: 8
+        }}>
+          {toast.type === 'success' ? <CheckCircle size={16} /> : <AlertCircle size={16} />}
+          {toast.msg}
+        </div>
+      )}
+
+      {/* ΓöÇΓöÇ CSV Import Card ΓöÇΓöÇ */}
+      <div className="card" style={{ marginBottom: '1.5rem', border: '1px solid var(--border-color)' }}>
+        <div style={{ display: 'flex', alignItems: 'flex-start', gap: '1.5rem', flexWrap: 'wrap' }}>
+          <div style={{ flex: 1, minWidth: 260 }}>
+            <h4 style={{ margin: '0 0 0.4rem', display: 'flex', alignItems: 'center', gap: 6 }}>
+              <Tag size={16} color="var(--accent)" /> Import Player IDs from OneSignal CSV
+            </h4>
+            <p style={{ margin: '0 0 0.75rem', color: 'var(--text-secondary)', fontSize: 13 }}>
+              Upload the CSV exported from <strong>OneSignal ΓåÆ Audience ΓåÆ Export</strong>.<br />
+              The file must have <code>external_id</code> and <code>player_id</code> columns.<br />
+              Existing users matched by <code>external_id</code> will have their Player ID saved automatically.
+            </p>
+            <label style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 10 }}>
+              <input
+                type="checkbox"
+                checked={csvSyncTags}
+                onChange={e => setCsvSyncTags(e.target.checked)}
+                style={{ width: 16, height: 16, cursor: 'pointer' }}
+              />
+              <span style={{ fontSize: 13, color: 'var(--text-primary)' }}>
+                Also sync profile tags after import (name, email, verified, etc.)
+              </span>
+            </label>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+              <input
+                ref={csvInputRef}
+                type="file"
+                accept=".csv,text/csv"
+                style={{ display: 'none' }}
+                onChange={handleCsvImport}
+              />
+              <button
+                id="onesignal-csv-upload-btn"
+                className="btn btn-primary"
+                style={{ gap: 6 }}
+                disabled={csvImporting}
+                onClick={() => csvInputRef.current?.click()}
+              >
+                {csvImporting
+                  ? <><RefreshCw size={14} style={{ animation: 'spin 1s linear infinite' }} /> Importing...</>
+                  : <><Tag size={14} /> Upload CSV & Import</>}
+              </button>
+              {csvImporting && <span style={{ fontSize: 12, color: 'var(--text-secondary)' }}>This may take a few secondsΓÇª</span>}
+            </div>
+          </div>
+
+          {/* Result summary */}
+          {csvResult && (
+            <div style={{
+              minWidth: 200, background: 'var(--bg-sidebar)', borderRadius: 8,
+              padding: '0.85rem 1.1rem', fontSize: 13
+            }}>
+              <div style={{ fontWeight: 600, marginBottom: 6 }}>Import Result</div>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
+                <span style={{ color: '#22c55e' }}>Γ£à Updated: {csvResult.updated}</span>
+                <span style={{ color: '#f59e0b' }}>ΓÜá∩╕Å Not found: {csvResult.notFound}</span>
+                <span style={{ color: '#ef4444' }}>Γ¥î Failed: {csvResult.failed}</span>
+                <span style={{ color: 'var(--text-secondary)' }}>Total rows: {csvResult.totalProcessed}</span>
+              </div>
+            </div>
+          )}
+        </div>
+      </div>
+
+      {/* Stats row */}
+      <div className="dashboard-grid" style={{ marginBottom: '1.5rem' }}>
+
+        <div className="card stat-card">
+          <span className="stat-title">Total Users Shown</span>
+          <span className="stat-value">{pagination?.total ?? '...'}</span>
+        </div>
+        <div className="card stat-card">
+          <span className="stat-title">With Player ID</span>
+          <span className="stat-value" style={{ color: 'var(--success, #22c55e)' }}>{withPlayerIdCount}</span>
+        </div>
+        <div className="card stat-card">
+          <span className="stat-title">Without Player ID</span>
+          <span className="stat-value" style={{ color: 'var(--danger, #ef4444)' }}>{withoutPlayerIdCount}</span>
+        </div>
+        <div className="card stat-card" style={{ display: 'flex', flexDirection: 'column', justifyContent: 'center', gap: 8 }}>
+          <button
+            className="btn btn-primary"
+            style={{ justifyContent: 'center', gap: 6, fontSize: 13 }}
+            onClick={handleSyncAll}
+            disabled={syncingAll}
+          >
+            <RefreshCw size={14} style={{ animation: syncingAll ? 'spin 1s linear infinite' : 'none' }} />
+            {syncingAll ? 'Syncing All...' : 'Bulk Sync All Tags'}
+          </button>
+          <small style={{ color: 'var(--text-secondary)', textAlign: 'center', fontSize: 11 }}>
+            Updates name, email, verified, coins for all users with a Player ID
+          </small>
+        </div>
+      </div>
+
+      {/* Search */}
+      <div className="card" style={{ marginBottom: '1.5rem' }}>
+        <div style={{ display: 'flex', gap: 10, alignItems: 'center' }}>
+          <div style={{ position: 'relative', flex: 1 }}>
+            <Search size={16} style={{ position: 'absolute', left: 12, top: '50%', transform: 'translateY(-50%)', color: 'var(--text-secondary)' }} />
+            <input
+              type="text"
+              placeholder="Search by name or email..."
+              value={search}
+              onChange={e => setSearch(e.target.value)}
+              onKeyDown={e => e.key === 'Enter' && handleSearch()}
+              style={{ width: '100%', padding: '0.65rem 0.75rem 0.65rem 2.4rem', borderRadius: 8, border: '1px solid var(--border-color)', background: 'var(--bg-main)', color: 'var(--text-primary)', boxSizing: 'border-box' }}
+            />
+          </div>
+          <button className="btn btn-primary" style={{ gap: 6, whiteSpace: 'nowrap' }} onClick={handleSearch}>
+            <Search size={14} /> Search
+          </button>
+          <button className="btn" style={{ gap: 6, whiteSpace: 'nowrap', border: '1px solid var(--border-color)' }} onClick={() => { setSearch(''); fetchUsers(1, ''); }}>
+            Clear
+          </button>
+        </div>
+      </div>
+
+      {/* Table */}
+      <div className="card" style={{ padding: 0, overflow: 'hidden' }}>
+        <div style={{ overflowX: 'auto' }}>
+          <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 13 }}>
+            <thead>
+              <tr style={{ background: 'var(--bg-sidebar)', borderBottom: '1px solid var(--border-color)' }}>
+                {['ID', 'Name', 'Email', 'Verified', 'Onboarded', 'Coins', 'Player ID Status', 'Actions'].map(h => (
+                  <th key={h} style={{ padding: '0.85rem 1rem', textAlign: 'left', fontWeight: 600, color: 'var(--text-secondary)', fontSize: 12, whiteSpace: 'nowrap' }}>{h}</th>
+                ))}
+              </tr>
+            </thead>
+            <tbody>
+              {loading ? (
+                <tr><td colSpan={8} style={{ padding: '3rem', textAlign: 'center', color: 'var(--text-secondary)' }}>Loading users...</td></tr>
+              ) : users.length === 0 ? (
+                <tr><td colSpan={8} style={{ padding: '3rem', textAlign: 'center', color: 'var(--text-secondary)' }}>No users found</td></tr>
+              ) : users.map(user => (
+                <tr key={user.id} style={{ borderBottom: '1px solid var(--border-color)' }}>
+                  <td style={{ padding: '0.75rem 1rem', color: 'var(--text-secondary)' }}>#{user.id}</td>
+                  <td style={{ padding: '0.75rem 1rem', fontWeight: 500 }}>{user.name || <span style={{ color: 'var(--text-secondary)' }}>ΓÇö</span>}</td>
+                  <td style={{ padding: '0.75rem 1rem', color: 'var(--text-secondary)' }}>{user.email}</td>
+                  <td style={{ padding: '0.75rem 1rem' }}>
+                    {user.isVerified
+                      ? <span style={{ color: '#22c55e', display: 'flex', alignItems: 'center', gap: 4 }}><CheckCircle size={14} /> Yes</span>
+                      : <span style={{ color: '#ef4444', display: 'flex', alignItems: 'center', gap: 4 }}><XCircle size={14} /> No</span>}
+                  </td>
+                  <td style={{ padding: '0.75rem 1rem' }}>
+                    {user.isOnboarded
+                      ? <span style={{ color: '#22c55e', display: 'flex', alignItems: 'center', gap: 4 }}><CheckCircle size={14} /> Yes</span>
+                      : <span style={{ color: '#f59e0b', display: 'flex', alignItems: 'center', gap: 4 }}><Clock size={14} /> No</span>}
+                  </td>
+                  <td style={{ padding: '0.75rem 1rem' }}>{user.coinBalance ?? 0}</td>
+                  <td style={{ padding: '0.75rem 1rem' }}>
+                    {user.oneSignalPlayerId ? (
+                      <div>
+                        <span style={{
+                          display: 'inline-flex', alignItems: 'center', gap: 4,
+                          background: 'rgba(34,197,94,0.12)', color: '#22c55e',
+                          padding: '2px 8px', borderRadius: 20, fontSize: 11, fontWeight: 600
+                        }}>
+                          <Shield size={11} /> Registered
+                        </span>
+                        <div style={{ marginTop: 4, fontSize: 11, color: 'var(--text-secondary)', fontFamily: 'monospace', wordBreak: 'break-all', maxWidth: 180 }}>
+                          {user.oneSignalPlayerId.substring(0, 18)}...
+                        </div>
+                      </div>
+                    ) : (
+                      <span style={{
+                        display: 'inline-flex', alignItems: 'center', gap: 4,
+                        background: 'rgba(239,68,68,0.12)', color: '#ef4444',
+                        padding: '2px 8px', borderRadius: 20, fontSize: 11, fontWeight: 600
+                      }}>
+                        <AlertCircle size={11} /> No Player ID
+                      </span>
+                    )}
+                  </td>
+                  <td style={{ padding: '0.75rem 1rem' }}>
+                    <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
+                      {/* Sync button ΓÇô only if player ID exists */}
+                      {user.oneSignalPlayerId && (
+                        <button
+                          title="Sync standard tags to OneSignal"
+                          onClick={() => handleSyncOne(user.id)}
+                          disabled={syncingId === user.id}
+                          style={{
+                            padding: '4px 10px', borderRadius: 6, border: '1px solid var(--border-color)',
+                            background: 'transparent', cursor: 'pointer', color: 'var(--accent)',
+                            display: 'flex', alignItems: 'center', gap: 4, fontSize: 12
+                          }}>
+                          <RefreshCw size={12} style={{ animation: syncingId === user.id ? 'spin 1s linear infinite' : 'none' }} />
+                          {syncingId === user.id ? '...' : 'Sync'}
+                        </button>
+                      )}
+                      {/* Edit custom tags */}
+                      {user.oneSignalPlayerId && (
+                        <button
+                          title="Add/update custom tags"
+                          onClick={() => openTagEditor(user)}
+                          style={{
+                            padding: '4px 10px', borderRadius: 6, border: '1px solid var(--border-color)',
+                            background: 'transparent', cursor: 'pointer', color: 'var(--text-primary)',
+                            display: 'flex', alignItems: 'center', gap: 4, fontSize: 12
+                          }}>
+                          <Tag size={12} /> Tags
+                        </button>
+                      )}
+                      {/* Set / override player ID */}
+                      <button
+                        title="Set or override OneSignal Player ID"
+                        onClick={() => openPlayerIdEditor(user)}
+                        style={{
+                          padding: '4px 10px', borderRadius: 6, border: '1px solid var(--border-color)',
+                          background: 'transparent', cursor: 'pointer', color: 'var(--text-secondary)',
+                          display: 'flex', alignItems: 'center', gap: 4, fontSize: 12
+                        }}>
+                        <Edit3 size={12} /> {user.oneSignalPlayerId ? 'Edit ID' : 'Set ID'}
+                      </button>
+                    </div>
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+
+        {/* Pagination */}
+        {pagination && pagination.totalPages > 1 && (
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 12, padding: '1rem', borderTop: '1px solid var(--border-color)' }}>
+            <button
+              onClick={() => { const np = page - 1; setPage(np); fetchUsers(np, search); }}
+              disabled={page <= 1}
+              style={{ padding: '6px 12px', borderRadius: 6, border: '1px solid var(--border-color)', background: 'transparent', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 4, color: 'var(--text-primary)' }}
+            >
+              <ChevronLeft size={14} /> Prev
+            </button>
+            <span style={{ color: 'var(--text-secondary)', fontSize: 13 }}>
+              Page {pagination.page} of {pagination.totalPages} ({pagination.total} users)
+            </span>
+            <button
+              onClick={() => { const np = page + 1; setPage(np); fetchUsers(np, search); }}
+              disabled={page >= pagination.totalPages}
+              style={{ padding: '6px 12px', borderRadius: 6, border: '1px solid var(--border-color)', background: 'transparent', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 4, color: 'var(--text-primary)' }}
+            >
+              Next <ChevronRight size={14} />
+            </button>
+          </div>
+        )}
+      </div>
+
+      {/* ΓöÇΓöÇ Tag Editor Modal ΓöÇΓöÇ */}
+      {editUser && (
+        <div style={{
+          position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.6)', zIndex: 1000,
+          display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 20
+        }}>
+          <div className="card" style={{ width: '100%', maxWidth: 520, maxHeight: '90vh', overflowY: 'auto' }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1.25rem' }}>
+              <h3 style={{ margin: 0, display: 'flex', alignItems: 'center', gap: 8 }}>
+                <Tag size={18} color="var(--accent)" />
+                Edit Tags ΓÇö {editUser.name || editUser.email}
+              </h3>
+              <button onClick={() => setEditUser(null)} style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--text-secondary)', fontSize: 20 }}>Γ£ò</button>
+            </div>
+
+            <p style={{ color: 'var(--text-secondary)', fontSize: 13, marginBottom: '1rem' }}>
+              These tags merge with existing ones on OneSignal. Set a value to <code>""</code> to delete a tag.
+            </p>
+
+            {editTags.map((row, i) => (
+              <div key={i} style={{ display: 'flex', gap: 8, marginBottom: 8, alignItems: 'center' }}>
+                <input
+                  placeholder="tag_key"
+                  value={row.key}
+                  onChange={e => updateTagRow(i, 'key', e.target.value)}
+                  style={{ flex: 1, padding: '0.6rem', borderRadius: 6, border: '1px solid var(--border-color)', background: 'var(--bg-main)', color: 'var(--text-primary)' }}
+                />
+                <span style={{ color: 'var(--text-secondary)' }}>=</span>
+                <input
+                  placeholder="value (empty = delete)"
+                  value={row.value}
+                  onChange={e => updateTagRow(i, 'value', e.target.value)}
+                  style={{ flex: 2, padding: '0.6rem', borderRadius: 6, border: '1px solid var(--border-color)', background: 'var(--bg-main)', color: 'var(--text-primary)' }}
+                />
+                {editTags.length > 1 && (
+                  <button onClick={() => removeTagRow(i)} style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#ef4444', fontSize: 18 }}>Γ£ò</button>
+                )}
+              </div>
+            ))}
+
+            <button onClick={addTagRow} style={{ background: 'none', border: '1px dashed var(--border-color)', borderRadius: 6, padding: '0.5rem 1rem', cursor: 'pointer', color: 'var(--accent)', width: '100%', marginBottom: '1.25rem', fontSize: 13 }}>
+              + Add another tag
+            </button>
+
+            <div style={{ display: 'flex', gap: 10, justifyContent: 'flex-end' }}>
+              <button onClick={() => setEditUser(null)} className="btn" style={{ border: '1px solid var(--border-color)' }}>Cancel</button>
+              <button onClick={saveEditTags} className="btn btn-primary" disabled={tagSaving}>
+                {tagSaving ? 'Saving...' : 'Save Tags'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ΓöÇΓöÇ Player ID Editor Modal ΓöÇΓöÇ */}
+      {playerIdUser && (
+        <div style={{
+          position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.6)', zIndex: 1000,
+          display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 20
+        }}>
+          <div className="card" style={{ width: '100%', maxWidth: 460 }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1.25rem' }}>
+              <h3 style={{ margin: 0, display: 'flex', alignItems: 'center', gap: 8 }}>
+                <Shield size={18} color="var(--accent)" />
+                Set Player ID ΓÇö {playerIdUser.name || playerIdUser.email}
+              </h3>
+              <button onClick={() => setPlayerIdUser(null)} style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--text-secondary)', fontSize: 20 }}>Γ£ò</button>
+            </div>
+
+            <p style={{ color: 'var(--text-secondary)', fontSize: 13, marginBottom: '1rem' }}>
+              Paste the OneSignal Player ID (from the OneSignal dashboard or device logs).
+              After saving, all standard profile tags will be synced automatically.
+            </p>
+
+            <input
+              type="text"
+              placeholder="e.g. 58bf29db-d9ed-4726-ae4f-2bb38d3289a2"
+              value={playerIdInput}
+              onChange={e => setPlayerIdInput(e.target.value)}
+              style={{ width: '100%', padding: '0.7rem', borderRadius: 6, border: '1px solid var(--border-color)', background: 'var(--bg-main)', color: 'var(--text-primary)', fontFamily: 'monospace', marginBottom: '1.25rem', boxSizing: 'border-box' }}
+            />
+
+            <div style={{ display: 'flex', gap: 10, justifyContent: 'flex-end' }}>
+              <button onClick={() => setPlayerIdUser(null)} className="btn" style={{ border: '1px solid var(--border-color)' }}>Cancel</button>
+              <button onClick={savePlayerId} className="btn btn-primary" disabled={playerIdSaving || !playerIdInput.trim()}>
+                {playerIdSaving ? 'Saving & Syncing...' : 'Save & Sync Tags'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Spin keyframe injected inline */}
+      <style>{`@keyframes spin { from { transform: rotate(0deg); } to { transform: rotate(360deg); } }`}</style>
+    </div>
+  );
+};
+
 function App() {
   const [isAuthenticated, setIsAuthenticated] = useState(!!localStorage.getItem('admin_token'));
   
@@ -2649,6 +3203,7 @@ function App() {
                   <Route path="/tickets" element={<TicketsPage />} />
                   <Route path="/create-profile" element={<CreateProfilePage />} />
                   <Route path="/feedback" element={<FeedbackPage />} />
+                  <Route path="/onesignal-tags" element={<OneSignalTagsPage />} />
                   <Route path="/jobs" element={<JobsPage />} />
                   <Route path="/push-notifications" element={<PushNotificationsPage />} />
                   <Route path="/ambassadors" element={<AmbassadorsPage />} />

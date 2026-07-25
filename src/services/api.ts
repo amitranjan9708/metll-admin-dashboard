@@ -194,5 +194,41 @@ export const AdminService = {
     });
     return response.data;
   },
+
+  // ── OneSignal Tag Management ───────────────────────────────────────────────
+
+  getOneSignalUsers: async (page = 1, limit = 50, search = '') => {
+    const response = await api.get(`/admin/onesignal/users?page=${page}&limit=${limit}&search=${encodeURIComponent(search)}`);
+    return response.data;
+  },
+
+  syncUserTags: async (userId: number) => {
+    const response = await api.post(`/admin/onesignal/sync/${userId}`);
+    return response.data;
+  },
+
+  syncAllTags: async () => {
+    const response = await api.post('/admin/onesignal/sync-all');
+    return response.data;
+  },
+
+  updateUserTags: async (userId: number, tags: Record<string, string>) => {
+    const response = await api.patch(`/admin/onesignal/tags/${userId}`, { tags });
+    return response.data;
+  },
+
+  setPlayerIdAdmin: async (userId: number, playerId: string) => {
+    const response = await api.put(`/admin/onesignal/player-id/${userId}`, { playerId });
+    return response.data;
+  },
+
+  importPlayerIds: async (
+    entries: { externalId: string; playerId: string; subscribed: boolean }[],
+    syncTags = false
+  ) => {
+    const response = await api.post('/admin/onesignal/import-player-ids', { entries, syncTags });
+    return response.data;
+  },
 };
+
 

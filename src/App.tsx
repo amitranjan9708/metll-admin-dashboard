@@ -906,8 +906,14 @@ const BulkEmailPage = () => {
   const [subject, setSubject] = useState('');
   const [html, setHtml] = useState('');
   const [file, setFile] = useState<File | null>(null);
+  const [fromEmail, setFromEmail] = useState('Metll <noreply@metll.in>');
   const [loading, setLoading] = useState(false);
   const [result, setResult] = useState<any>(null);
+
+  const SENDER_OPTIONS = [
+    { value: 'Metll <noreply@metll.in>', label: 'noreply@metll.in (Default)' },
+    { value: 'Metll Support <support@metll.in>', label: 'support@metll.in' },
+  ];
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -924,6 +930,7 @@ const BulkEmailPage = () => {
       formData.append('subject', subject);
       formData.append('html', html);
       formData.append('file', file);
+      formData.append('fromEmail', fromEmail);
 
       const res = await AdminService.bulkSendEmail(formData);
       setResult(res);
@@ -933,6 +940,7 @@ const BulkEmailPage = () => {
         setSubject('');
         setHtml('');
         setFile(null);
+        setFromEmail('Metll <noreply@metll.in>');
       }
     } catch (error: any) {
       console.error('Error sending bulk emails:', error);
@@ -950,6 +958,21 @@ const BulkEmailPage = () => {
       <div className="card">
         <form onSubmit={handleSubmit} style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
           
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+            <label htmlFor="fromEmail" style={{ fontWeight: '600' }}>Sender Email</label>
+            <select
+              id="fromEmail"
+              value={fromEmail}
+              onChange={e => setFromEmail(e.target.value)}
+              style={{ padding: '10px', borderRadius: '6px', border: '1px solid #333', background: '#111', color: '#fff', cursor: 'pointer' }}
+            >
+              {SENDER_OPTIONS.map(opt => (
+                <option key={opt.value} value={opt.value}>{opt.label}</option>
+              ))}
+            </select>
+            <small style={{ color: '#888' }}>Emails will be sent from this address. Both domains are verified on Resend.</small>
+          </div>
+
           <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
             <label htmlFor="subject" style={{ fontWeight: '600' }}>Email Subject</label>
             <input 

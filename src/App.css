@@ -5,7 +5,9 @@
   display: flex;
   flex-direction: column;
   padding: 1.5rem 0;
-  border-right: 1px solid var(--border-sidebar);
+  border: none;
+  box-shadow: var(--shadow-outer);
+  z-index: 10;
 }
 
 .sidebar-header {
@@ -46,23 +48,27 @@
 }
 
 .nav-item:hover {
-  background-color: rgba(255, 255, 255, 0.05);
-  color: var(--text-inverse);
+  background-color: transparent;
+  color: var(--accent);
+  box-shadow: var(--shadow-btn-hover);
 }
 
 .nav-item.active {
-  background-color: var(--accent);
-  color: var(--text-inverse);
+  background-color: transparent;
+  color: var(--accent);
+  box-shadow: var(--shadow-inner);
 }
 
 .topnav {
   height: 70px;
   background-color: var(--bg-card);
-  border-bottom: 1px solid var(--border-color);
+  border: none;
+  box-shadow: var(--shadow-outer);
   display: flex;
   align-items: center;
   justify-content: space-between;
   padding: 0 2rem;
+  z-index: 5;
 }
 
 .page-title {
@@ -80,11 +86,12 @@
   width: 40px;
   height: 40px;
   border-radius: 20px;
-  background-color: var(--accent);
+  background-color: var(--bg-color);
+  box-shadow: var(--shadow-outer);
   display: flex;
   align-items: center;
   justify-content: center;
-  color: white;
+  color: var(--accent);
   font-weight: 600;
 }
 
@@ -153,29 +160,59 @@ tr:last-child td {
   border-radius: 8px;
   font-weight: 500;
   border: none;
-  transition: background-color 0.2s;
+  transition: all 0.2s;
   display: inline-flex;
   align-items: center;
   gap: 0.5rem;
+  background-color: var(--bg-color);
+  color: var(--text-primary);
+  box-shadow: var(--shadow-outer);
+}
+
+.btn:hover {
+  box-shadow: var(--shadow-btn-hover);
+}
+
+.btn:active {
+  box-shadow: var(--shadow-btn-active);
+}
+
+.btn:disabled {
+  opacity: 0.5;
+  box-shadow: var(--shadow-outer);
+  cursor: not-allowed;
 }
 
 .btn-primary {
-  background-color: var(--accent);
-  color: white;
-}
-
-.btn-primary:hover {
-  background-color: var(--accent-hover);
+  color: var(--accent);
+  font-weight: 700;
 }
 
 .btn-danger {
-  background-color: var(--danger);
-  color: white;
+  color: var(--danger);
+  font-weight: 700;
 }
 
 .btn-success {
-  background-color: var(--success);
-  color: white;
+  color: var(--success);
+  font-weight: 700;
+}
+
+/* Inputs */
+input, select, textarea {
+  background-color: var(--bg-color);
+  border: none;
+  box-shadow: var(--shadow-inner);
+  border-radius: 8px;
+  padding: 0.75rem;
+  color: var(--text-primary);
+  font-family: inherit;
+  width: 100%;
+  outline: none;
+}
+
+input:focus, select:focus, textarea:focus {
+  box-shadow: inset 6px 6px 12px var(--shadow-dark), inset -6px -6px 12px var(--shadow-light);
 }
 
 .badge {

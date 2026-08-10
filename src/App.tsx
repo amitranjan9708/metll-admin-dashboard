@@ -907,13 +907,30 @@ const BulkEmailPage = () => {
   const [html, setHtml] = useState('');
   const [file, setFile] = useState<File | null>(null);
   const [fromEmail, setFromEmail] = useState('Metll <noreply@metll.in>');
+  // Split the from address into editable parts
+  const [senderName, setSenderName] = useState('Metll');
+  const [emailPrefix, setEmailPrefix] = useState('noreply');
+
+  // Keep fromEmail in sync with the two editable parts
+  const buildFromEmail = (name: string, prefix: string) => {
+    const cleanPrefix = prefix.replace(/[^a-zA-Z0-9._-]/g, '').toLowerCase();
+    return `${name.trim() || 'Metll'} <${cleanPrefix || 'noreply'}@metll.in>`;
+  };
+
+  const handleSenderNameChange = (val: string) => {
+    setSenderName(val);
+    setFromEmail(buildFromEmail(val, emailPrefix));
+  };
+
+  const handlePrefixChange = (val: string) => {
+    // Only allow alphanumeric, dots, hyphens
+    const clean = val.replace(/[^a-zA-Z0-9._-]/g, '').toLowerCase();
+    setEmailPrefix(clean);
+    setFromEmail(buildFromEmail(senderName, clean));
+  };
+
   const [loading, setLoading] = useState(false);
   const [result, setResult] = useState<any>(null);
-
-  const SENDER_OPTIONS = [
-    { value: 'Metll <noreply@metll.in>', label: 'noreply@metll.in (Default)' },
-    { value: 'Metll Support <support@metll.in>', label: 'support@metll.in' },
-  ];
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -940,6 +957,8 @@ const BulkEmailPage = () => {
         setSubject('');
         setHtml('');
         setFile(null);
+        setSenderName('Metll');
+        setEmailPrefix('noreply');
         setFromEmail('Metll <noreply@metll.in>');
       }
     } catch (error: any) {
@@ -959,18 +978,48 @@ const BulkEmailPage = () => {
         <form onSubmit={handleSubmit} style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
           
           <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
-            <label htmlFor="fromEmail" style={{ fontWeight: '600' }}>Sender Email</label>
-            <select
-              id="fromEmail"
-              value={fromEmail}
-              onChange={e => setFromEmail(e.target.value)}
-              style={{ padding: '10px', borderRadius: '6px', border: '1px solid #333', background: '#111', color: '#fff', cursor: 'pointer' }}
-            >
-              {SENDER_OPTIONS.map(opt => (
-                <option key={opt.value} value={opt.value}>{opt.label}</option>
-              ))}
-            </select>
-            <small style={{ color: '#888' }}>Emails will be sent from this address. Both domains are verified on Resend.</small>
+            <label style={{ fontWeight: '600' }}>Sender Email</label>
+            {/* Display name input */}
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
+              <input
+                type="text"
+                placeholder="Display name (e.g. Metll, Metll Team)"
+                value={senderName}
+                onChange={e => handleSenderNameChange(e.target.value)}
+                style={{ padding: '10px', borderRadius: '6px', border: '1px solid #333', background: '#111', color: '#fff' }}
+              />
+              {/* Prefix + locked domain */}
+              <div style={{ display: 'flex', alignItems: 'center', borderRadius: '6px', border: '1px solid #444', background: '#111', overflow: 'hidden' }}>
+                <input
+                  id="fromEmail"
+                  type="text"
+                  value={emailPrefix}
+                  onChange={e => handlePrefixChange(e.target.value)}
+                  placeholder="noreply"
+                  style={{
+                    flex: 1,
+                    padding: '10px 12px',
+                    background: 'transparent',
+                    border: 'none',
+                    color: '#fff',
+                    outline: 'none',
+                    fontSize: '14px',
+                  }}
+                />
+                <span style={{
+                  padding: '10px 14px',
+                  background: '#1e1e2e',
+                  color: '#888',
+                  fontSize: '14px',
+                  borderLeft: '1px solid #333',
+                  userSelect: 'none',
+                  whiteSpace: 'nowrap',
+                }}>@metll.in</span>
+              </div>
+              <small style={{ color: '#888' }}>
+                Will send as: <strong style={{ color: '#aaa' }}>{fromEmail}</strong>
+              </small>
+            </div>
           </div>
 
           <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>

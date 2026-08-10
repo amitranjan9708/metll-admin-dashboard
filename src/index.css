@@ -1,25 +1,32 @@
 @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap');
 
 :root {
-  --bg-color: #F8F9FA;
-  --bg-sidebar: #1F1F1F;
-  --bg-card: #FFFFFF;
+  --bg-color: #E6E7EE;
+  --bg-sidebar: #E6E7EE;
+  --bg-card: #E6E7EE;
   
-  --text-primary: #1A1A1A;
+  --text-primary: #333333;
   --text-secondary: #6B6B6B;
-  --text-inverse: #FFFFFF;
-  --text-sidebar: #A4B8E7;
+  --text-inverse: #333333;
+  --text-sidebar: #555555;
 
-  --accent: #A8B4E7;
-  --accent-hover: #93A1D9;
-  --accent-light: rgba(168, 180, 231, 0.15);
+  --accent: #5C75E5;
+  --accent-hover: #4B63CB;
+  --accent-light: rgba(92, 117, 229, 0.15);
   
-  --border-color: rgba(0, 0, 0, 0.08);
-  --border-sidebar: rgba(255, 255, 255, 0.1);
+  --border-color: transparent;
+  --border-sidebar: transparent;
 
   --danger: #FF4B4B;
   --success: #2EBA75;
   --warning: #F5A623;
+
+  --shadow-light: rgba(255, 255, 255, 0.8);
+  --shadow-dark: rgba(163, 177, 198, 0.6);
+  --shadow-outer: 8px 8px 16px var(--shadow-dark), -8px -8px 16px var(--shadow-light);
+  --shadow-inner: inset 4px 4px 8px var(--shadow-dark), inset -4px -4px 8px var(--shadow-light);
+  --shadow-btn-hover: 4px 4px 8px var(--shadow-dark), -4px -4px 8px var(--shadow-light);
+  --shadow-btn-active: inset 4px 4px 8px var(--shadow-dark), inset -4px -4px 8px var(--shadow-light);
 }
 
 * {
@@ -77,8 +84,8 @@ button {
 
 .card {
   background: var(--bg-card);
-  border-radius: 12px;
+  border-radius: 16px;
   padding: 1.5rem;
-  box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.05), 0 2px 4px -1px rgba(0, 0, 0, 0.03);
-  border: 1px solid var(--border-color);
+  box-shadow: var(--shadow-outer);
+  border: none;
 }
